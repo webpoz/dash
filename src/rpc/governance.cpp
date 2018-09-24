@@ -213,7 +213,7 @@ static UniValue gobject_prepare(const JSONRPCRequest& request)
     COutPoint outpoint;
     outpoint.SetNull();
     if (!request.params[5].isNull() && !request.params[6].isNull()) {
-        uint256 collateralHash = ParseHashV(request.params[5], "outputHash");
+        uint256 collateralHash(ParseHashV(request.params[5], "outputHash"));
         int32_t collateralIndex = ParseInt32V(request.params[6], "outputIndex");
         if (collateralHash.IsNull() || collateralIndex < 0) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, strprintf("invalid hash or index: %s-%d", collateralHash.ToString(), collateralIndex));
@@ -430,9 +430,7 @@ static UniValue gobject_vote_conf(const JSONRPCRequest& request)
 {
     gobject_vote_conf_help(request);
 
-    uint256 hash;
-
-    hash = ParseHashV(request.params[0], "Object hash");
+    uint256 hash(ParseHashV(request.params[0], "Object hash"));
     std::string strVoteSignal = request.params[1].get_str();
     std::string strVoteOutcome = request.params[2].get_str();
 
@@ -608,7 +606,7 @@ static UniValue gobject_vote_many(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
 
-    uint256 hash = ParseHashV(request.params[0], "Object hash");
+    uint256 hash(ParseHashV(request.params[0], "Object hash"));
     std::string strVoteSignal = request.params[1].get_str();
     std::string strVoteOutcome = request.params[2].get_str();
 
@@ -667,7 +665,7 @@ static UniValue gobject_vote_alias(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
 
-    uint256 hash = ParseHashV(request.params[0], "Object hash");
+    uint256 hash(ParseHashV(request.params[0], "Object hash"));
     std::string strVoteSignal = request.params[1].get_str();
     std::string strVoteOutcome = request.params[2].get_str();
 
@@ -685,7 +683,7 @@ static UniValue gobject_vote_alias(const JSONRPCRequest& request)
 
     EnsureWalletIsUnlocked(wallet.get());
 
-    uint256 proTxHash = ParseHashV(request.params[3], "protx-hash");
+    uint256 proTxHash(ParseHashV(request.params[3], "protx-hash"));
     auto dmn = deterministicMNManager->GetListAtChainTip().GetValidMN(proTxHash);
     if (!dmn) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid or unknown proTxHash");
@@ -853,7 +851,7 @@ static UniValue gobject_get(const JSONRPCRequest& request)
     gobject_get_help(request);
 
     // COLLECT VARIABLES FROM OUR USER
-    uint256 hash = ParseHashV(request.params[0], "GovObj hash");
+    uint256 hash(ParseHashV(request.params[0], "GovObj hash"));
 
     if (g_txindex) {
         g_txindex->BlockUntilSyncedToCurrentChain();
@@ -946,11 +944,11 @@ static UniValue gobject_getcurrentvotes(const JSONRPCRequest& request)
 
     // COLLECT PARAMETERS FROM USER
 
-    uint256 hash = ParseHashV(request.params[0], "Governance hash");
+    uint256 hash(ParseHashV(request.params[0], "Governance hash"));
 
     COutPoint mnCollateralOutpoint;
     if (!request.params[1].isNull() && !request.params[2].isNull()) {
-        uint256 txid = ParseHashV(request.params[1], "Masternode Collateral hash");
+        uint256 txid(ParseHashV(request.params[1], "Masternode Collateral hash"));
         std::string strVout = request.params[2].get_str();
         mnCollateralOutpoint = COutPoint(txid, LocaleIndependentAtoi<uint32_t>(strVout));
     }
@@ -1079,11 +1077,11 @@ static UniValue voteraw(const JSONRPCRequest& request)
         RPCExamples{""}
     }.Check(request);
 
-    uint256 hashMnCollateralTx = ParseHashV(request.params[0], "mn collateral tx hash");
+    uint256 hashMnCollateralTx(ParseHashV(request.params[0], "mn collateral tx hash"));
     int nMnCollateralTxIndex = request.params[1].get_int();
     COutPoint outpoint = COutPoint(hashMnCollateralTx, nMnCollateralTxIndex);
 
-    uint256 hashGovObj = ParseHashV(request.params[2], "Governance hash");
+    uint256 hashGovObj(ParseHashV(request.params[2], "Governance hash"));
     std::string strVoteSignal = request.params[3].get_str();
     std::string strVoteOutcome = request.params[4].get_str();
 
