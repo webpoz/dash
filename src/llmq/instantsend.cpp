@@ -1526,8 +1526,8 @@ void CInstantSendManager::AskNodesForLockedTx(const uint256& txid, const CConnma
         if (nodesToAskFor.size() >= 4) {
             return;
         }
-        LOCK(pnode->m_tx_relay.cs_tx_inventory);
-        if (pnode->m_tx_relay.filterInventoryKnown.contains(txid)) {
+        LOCK(pnode->m_tx_relay->cs_tx_inventory);
+        if (pnode->m_tx_relay->filterInventoryKnown.contains(txid)) {
             pnode->AddRef();
             nodesToAskFor.emplace_back(pnode);
         }

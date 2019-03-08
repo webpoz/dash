@@ -567,8 +567,8 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
     X(addrBind);
     stats.m_mapped_as = addr.GetMappedAS(m_asmap);
     {
-        LOCK(m_tx_relay.cs_filter);
-        stats.fRelayTxes = m_tx_relay.fRelayTxes;
+        LOCK(m_tx_relay->cs_filter);
+        stats.fRelayTxes = m_tx_relay->fRelayTxes;
     }
     X(nLastSend);
     X(nLastRecv);
@@ -943,11 +943,11 @@ bool CConnman::AttemptToEvictConnection()
                 }
             }
 
-            LOCK(node->m_tx_relay.cs_filter);
+            LOCK(node->m_tx_relay->cs_filter);
             NodeEvictionCandidate candidate = {node->GetId(), node->nTimeConnected, node->nMinPingUsecTime,
                                                node->nLastBlockTime, node->nLastTXTime,
                                                HasAllDesirableServiceFlags(node->nServices),
-                                               node->m_tx_relay.fRelayTxes, node->m_tx_relay.pfilter != nullptr, node->nKeyedNetGroup,
+                                               node->m_tx_relay->fRelayTxes, node->m_tx_relay->pfilter != nullptr, node->nKeyedNetGroup,
                                                node->m_prefer_evict};
             vEvictionCandidates.push_back(candidate);
         }
@@ -3455,8 +3455,8 @@ void CConnman::RelayInvFiltered(CInv &inv, const CTransaction& relatedTx, const 
         if (pnode->nVersion < minProtoVersion || !pnode->CanRelay())
             continue;
         {
-            LOCK(pnode->m_tx_relay.cs_filter);
-            if(pnode->m_tx_relay.pfilter && !pnode->m_tx_relay.pfilter->IsRelevantAndUpdate(relatedTx))
+            LOCK(pnode->m_tx_relay->cs_filter);
+            if(pnode->m_tx_relay->pfilter && !pnode->m_tx_relay->pfilter->IsRelevantAndUpdate(relatedTx))
                 continue;
         }
         pnode->PushInventory(inv);
@@ -3470,8 +3470,8 @@ void CConnman::RelayInvFiltered(CInv &inv, const uint256& relatedTxHash, const i
         if (pnode->nVersion < minProtoVersion || !pnode->CanRelay())
             continue;
         {
-            LOCK(pnode->m_tx_relay.cs_filter);
-            if(pnode->m_tx_relay.pfilter && !pnode->m_tx_relay.pfilter->contains(relatedTxHash)) continue;
+            LOCK(pnode->m_tx_relay->cs_filter);
+            if(pnode->m_tx_relay->pfilter && !pnode->m_tx_relay->pfilter->contains(relatedTxHash)) continue;
         }
         pnode->PushInventory(inv);
     }
@@ -3621,6 +3621,7 @@ CNode::CNode(NodeId idIn, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn
     hSocket = hSocketIn;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     hashContinue = uint256();
+    m_tx_relay = MakeUnique<TxRelay>();
 
     for (const std::string &msg : getAllNetMessageTypes())
         mapRecvBytesPerMsgCmd[msg] = 0;
