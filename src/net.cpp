@@ -566,9 +566,11 @@ void CNode::copyStats(CNodeStats &stats, const std::vector<bool> &m_asmap)
     X(addr);
     X(addrBind);
     stats.m_mapped_as = addr.GetMappedAS(m_asmap);
-    {
+    if (m_tx_relay != nullptr) {
         LOCK(m_tx_relay->cs_filter);
         stats.fRelayTxes = m_tx_relay->fRelayTxes;
+    } else {
+        stats.fRelayTxes = false;
     }
     X(nLastSend);
     X(nLastRecv);
@@ -943,11 +945,17 @@ bool CConnman::AttemptToEvictConnection()
                 }
             }
 
-            LOCK(node->m_tx_relay->cs_filter);
+            bool peer_relay_txes = false;
+            bool peer_filter_not_null = false;
+            if (node->m_tx_relay != nullptr) {
+                LOCK(node->m_tx_relay->cs_filter);
+                peer_relay_txes = node->m_tx_relay->fRelayTxes;
+                peer_filter_not_null = node->m_tx_relay->pfilter != nullptr;
+            }
             NodeEvictionCandidate candidate = {node->GetId(), node->nTimeConnected, node->nMinPingUsecTime,
                                                node->nLastBlockTime, node->nLastTXTime,
                                                HasAllDesirableServiceFlags(node->nServices),
-                                               node->m_tx_relay->fRelayTxes, node->m_tx_relay->pfilter != nullptr, node->nKeyedNetGroup,
+                                               peer_relay_txes, peer_filter_not_null, node->nKeyedNetGroup,
                                                node->m_prefer_evict};
             vEvictionCandidates.push_back(candidate);
         }
@@ -3454,7 +3462,7 @@ void CConnman::RelayInvFiltered(CInv &inv, const CTransaction& relatedTx, const 
     for (const auto& pnode : vNodes) {
         if (pnode->nVersion < minProtoVersion || !pnode->CanRelay())
             continue;
-        {
+        if (pnode->m_tx_relay != nullptr) {
             LOCK(pnode->m_tx_relay->cs_filter);
             if(pnode->m_tx_relay->pfilter && !pnode->m_tx_relay->pfilter->IsRelevantAndUpdate(relatedTx))
                 continue;
@@ -3469,7 +3477,7 @@ void CConnman::RelayInvFiltered(CInv &inv, const uint256& relatedTxHash, const i
     for (const auto& pnode : vNodes) {
         if (pnode->nVersion < minProtoVersion || !pnode->CanRelay())
             continue;
-        {
+        if (pnode->m_tx_relay != nullptr) {
             LOCK(pnode->m_tx_relay->cs_filter);
             if(pnode->m_tx_relay->pfilter && !pnode->m_tx_relay->pfilter->contains(relatedTxHash)) continue;
         }

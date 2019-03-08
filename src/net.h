@@ -1199,7 +1199,7 @@ public:
 
     void AddInventoryKnown(const uint256& hash)
     {
-        {
+        if (m_tx_relay != nullptr) {
             LOCK(m_tx_relay->cs_tx_inventory);
             m_tx_relay->filterInventoryKnown.insert(hash);
         }
@@ -1208,12 +1208,16 @@ public:
     void PushInventory(const CInv& inv)
     {
         if (inv.type == MSG_TX || inv.type == MSG_DSTX) {
-            LOCK(m_tx_relay->cs_tx_inventory);
-            if (!m_tx_relay->filterInventoryKnown.contains(inv.hash)) {
-                LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
-                m_tx_relay->setInventoryTxToSend.insert(inv.hash);
+            if (m_tx_relay != nullptr) {
+                LOCK(m_tx_relay->cs_tx_inventory);
+                if (!m_tx_relay->filterInventoryKnown.contains(inv.hash)) {
+                    LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                    m_tx_relay->setInventoryTxToSend.insert(inv.hash);
+                } else {
+                    LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                }
             } else {
-                LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                LogPrint(BCLog::NET, "%s -- skipping unknown inv: %s peer=%d\n", __func__, inv.ToString(), id);
             }
         } else if (inv.type == MSG_BLOCK) {
             LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
@@ -1221,12 +1225,20 @@ public:
             vInventoryBlockToSend.push_back(inv.hash);
         } else {
             LOCK(cs_inventory);
-            LOCK(m_tx_relay->cs_tx_inventory);
-            if (!m_tx_relay->filterInventoryKnown.contains(inv.hash)) {
+            if (m_tx_relay != nullptr) {
+                LOCK(m_tx_relay->cs_tx_inventory);
+                if (!m_tx_relay->filterInventoryKnown.contains(inv.hash)) {
+                    LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                    vInventoryOtherToSend.push_back(inv);
+                } else {
+                    LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                }
+            } else {
+                // TODO KNST for this case we don't use inventory
+                // accordingly #2292 it can increase size of transmitted data.
+                // Should be added dedicated bloom filter
                 LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
                 vInventoryOtherToSend.push_back(inv);
-            } else {
-                LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);
             }
         }
     }
