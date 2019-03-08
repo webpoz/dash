@@ -1594,10 +1594,10 @@ void static ProcessGetBlockData(CNode* pfrom, const CChainParams& chainparams, c
                 bool sendMerkleBlock = false;
                 CMerkleBlock merkleBlock;
                 {
-                    LOCK(pfrom->cs_filter);
-                    if (pfrom->pfilter) {
+                    LOCK(pfrom->m_tx_relay.cs_filter);
+                    if (pfrom->m_tx_relay.pfilter) {
                         sendMerkleBlock = true;
-                        merkleBlock = CMerkleBlock(*pblock, *pfrom->pfilter);
+                        merkleBlock = CMerkleBlock(*pblock, *pfrom->m_tx_relay.pfilter);
                     }
                 }
                 if (sendMerkleBlock) {
@@ -1692,11 +1692,11 @@ void static ProcessGetData(CNode* pfrom, const CChainParams& chainparams, CConnm
                         connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::TX, *mi->second));
                     }
                     push = true;
-                } else if (pfrom->timeLastMempoolReq) {
+                } else if (pfrom->m_tx_relay.timeLastMempoolReq) {
                     auto txinfo = mempool.info(inv.hash);
                     // To protect privacy, do not answer getdata using the mempool when
                     // that TX couldn't have been INVed in reply to a MEMPOOL request.
-                    if (txinfo.tx && txinfo.nTime <= pfrom->timeLastMempoolReq) {
+                    if (txinfo.tx && txinfo.nTime <= pfrom->m_tx_relay.timeLastMempoolReq) {
                         if (dstx) {
                             connman->PushMessage(pfrom, msgMaker.Make(NetMsgType::DSTX, dstx));
                         } else {
@@ -2625,8 +2625,8 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
         pfrom->m_limited_node = (!(nServices & NODE_NETWORK) && (nServices & NODE_NETWORK_LIMITED));
 
         {
-            LOCK(pfrom->cs_filter);
-            pfrom->fRelayTxes = fRelay; // set to true after we get the first filter* message
+            LOCK(pfrom->m_tx_relay.cs_filter);
+            pfrom->m_tx_relay.fRelayTxes = fRelay; // set to true after we get the first filter* message
         }
 
         // Change version
@@ -3790,8 +3790,8 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
             return true;
         }
 
-        LOCK(pfrom->cs_inventory);
-        pfrom->fSendMempool = true;
+        LOCK(pfrom->m_tx_relay.cs_tx_inventory);
+        pfrom->m_tx_relay.fSendMempool = true;
         return true;
     }
 
@@ -3881,10 +3881,10 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
         }
         else
         {
-            LOCK(pfrom->cs_filter);
-            pfrom->pfilter.reset(new CBloomFilter(filter));
-            pfrom->pfilter->UpdateEmptyFull();
-            pfrom->fRelayTxes = true;
+            LOCK(pfrom->m_tx_relay.cs_filter);
+            pfrom->m_tx_relay.pfilter.reset(new CBloomFilter(filter));
+            pfrom->m_tx_relay.pfilter->UpdateEmptyFull();
+            pfrom->m_tx_relay.fRelayTxes = true;
         }
         return true;
     }
@@ -3899,9 +3899,9 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
         if (vData.size() > MAX_SCRIPT_ELEMENT_SIZE) {
             bad = true;
         } else {
-            LOCK(pfrom->cs_filter);
-            if (pfrom->pfilter) {
-                pfrom->pfilter->insert(vData);
+            LOCK(pfrom->m_tx_relay.cs_filter);
+            if (pfrom->m_tx_relay.pfilter) {
+                pfrom->m_tx_relay.pfilter->insert(vData);
             } else {
                 bad = true;
             }
@@ -3914,11 +3914,11 @@ bool ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRec
     }
 
     if (msg_type == NetMsgType::FILTERCLEAR) {
-        LOCK(pfrom->cs_filter);
+        LOCK(pfrom->m_tx_relay.cs_filter);
         if (pfrom->GetLocalServices() & NODE_BLOOM) {
-            pfrom->pfilter = nullptr;
+            pfrom->m_tx_relay.pfilter = nullptr;
         }
-        pfrom->fRelayTxes = true;
+        pfrom->m_tx_relay.fRelayTxes = true;
         return true;
     }
 
@@ -4642,8 +4642,10 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
         std::vector<CInv> vInv;
         {
             LOCK2(m_mempool.cs, pto->cs_inventory);
+            // KNST wtf
+            // LOCK(pto->m_tx_relay.cs_filter); likely no ???
 
-            size_t reserve = std::min<size_t>(pto->setInventoryTxToSend.size(), INVENTORY_BROADCAST_MAX_PER_1MB_BLOCK * MaxBlockSize() / 1000000);
+            size_t reserve = std::min<size_t>(pto->m_tx_relay.setInventoryTxToSend.size(), INVENTORY_BROADCAST_MAX_PER_1MB_BLOCK * MaxBlockSize() / 1000000);
             reserve = std::max<size_t>(reserve, pto->vInventoryBlockToSend.size());
             reserve = std::min<size_t>(reserve, MAX_INV_SZ);
             vInv.reserve(reserve);
@@ -4658,30 +4660,31 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
             }
             pto->vInventoryBlockToSend.clear();
 
+            LOCK(pto->m_tx_relay.cs_tx_inventory);
             // Check whether periodic sends should happen
             // Note: If this node is running in a Masternode mode, it makes no sense to delay outgoing txes
             // because we never produce any txes ourselves i.e. no privacy is lost in this case.
             bool fSendTrickle = pto->HasPermission(PF_NOBAN) || fMasternodeMode;
-            if (pto->nNextInvSend < current_time) {
+            if (pto->m_tx_relay.nNextInvSend < current_time) {
                 fSendTrickle = true;
                 if (pto->fInbound) {
-                    pto->nNextInvSend = std::chrono::microseconds{connman->PoissonNextSendInbound(current_time.count(), INVENTORY_BROADCAST_INTERVAL)};
+                    pto->m_tx_relay.nNextInvSend = std::chrono::microseconds{connman->PoissonNextSendInbound(current_time.count(), INVENTORY_BROADCAST_INTERVAL)};
                 } else {
                     // Use half the delay for regular outbound peers, as there is less privacy concern for them.
                     // and quarter the delay for Masternode outbound peers, as there is even less privacy concern in this case.
-                    pto->nNextInvSend = PoissonNextSend(current_time, std::chrono::seconds{INVENTORY_BROADCAST_INTERVAL >> 1 >> !pto->GetVerifiedProRegTxHash().IsNull()});
+                    pto->m_tx_relay.nNextInvSend = PoissonNextSend(current_time, std::chrono::seconds{INVENTORY_BROADCAST_INTERVAL >> 1 >> !pto->GetVerifiedProRegTxHash().IsNull()});
                 }
             }
 
             // Time to send but the peer has requested we not relay transactions.
             if (fSendTrickle) {
-                LOCK(pto->cs_filter);
-                if (!pto->fRelayTxes) pto->setInventoryTxToSend.clear();
+                LOCK(pto->m_tx_relay.cs_filter);
+                if (!pto->m_tx_relay.fRelayTxes) pto->m_tx_relay.setInventoryTxToSend.clear();
             }
 
             auto queueAndMaybePushInv = [this, pto, &vInv, &msgMaker](const CInv& invIn) {
-                AssertLockHeld(pto->cs_inventory);
-                pto->filterInventoryKnown.insert(invIn.hash);
+                AssertLockHeld(pto->m_tx_relay.cs_tx_inventory);
+                pto->m_tx_relay.filterInventoryKnown.insert(invIn.hash);
                 LogPrint(BCLog::NET, "SendMessages -- queued inv: %s  index=%d peer=%d\n", invIn.ToString(), vInv.size(), pto->GetId());
                 vInv.push_back(invIn);
                 if (vInv.size() == MAX_INV_SZ) {
@@ -4692,17 +4695,17 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
             };
 
             // Respond to BIP35 mempool requests
-            if (fSendTrickle && pto->fSendMempool) {
+            if (fSendTrickle && pto->m_tx_relay.fSendMempool) {
                 auto vtxinfo = m_mempool.infoAll();
-                pto->fSendMempool = false;
+                pto->m_tx_relay.fSendMempool = false;
 
-                LOCK(pto->cs_filter);
+                LOCK(pto->m_tx_relay.cs_filter);
 
                 // Send invs for txes and corresponding IS-locks
                 for (const auto& txinfo : vtxinfo) {
                     const uint256& hash = txinfo.tx->GetHash();
-                    pto->setInventoryTxToSend.erase(hash);
-                    if (pto->pfilter && !pto->pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
+                    pto->m_tx_relay.setInventoryTxToSend.erase(hash);
+                    if (pto->m_tx_relay.pfilter && !pto->m_tx_relay.pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
 
                     int nInvType = CCoinJoin::GetDSTX(hash) ? MSG_DSTX : MSG_TX;
                     queueAndMaybePushInv(CInv(nInvType, hash));
@@ -4720,15 +4723,15 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     queueAndMaybePushInv(CInv(MSG_CLSIG, chainlockHash));
                 }
 
-                pto->timeLastMempoolReq = GetTime();
+                pto->m_tx_relay.timeLastMempoolReq = GetTime();
             }
 
             // Determine transactions to relay
             if (fSendTrickle) {
                 // Produce a vector with all candidates for sending
                 std::vector<std::set<uint256>::iterator> vInvTx;
-                vInvTx.reserve(pto->setInventoryTxToSend.size());
-                for (std::set<uint256>::iterator it = pto->setInventoryTxToSend.begin(); it != pto->setInventoryTxToSend.end(); it++) {
+                vInvTx.reserve(pto->m_tx_relay.setInventoryTxToSend.size());
+                for (std::set<uint256>::iterator it = pto->m_tx_relay.setInventoryTxToSend.begin(); it != pto->m_tx_relay.setInventoryTxToSend.end(); it++) {
                     vInvTx.push_back(it);
                 }
                 // Topologically and fee-rate sort the inventory we send for privacy and priority reasons.
@@ -4738,7 +4741,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                 // No reason to drain out at many times the network's capacity,
                 // especially since we have many peers and some will draw much shorter delays.
                 unsigned int nRelayedTransactions = 0;
-                LOCK(pto->cs_filter);
+                LOCK(pto->m_tx_relay.cs_filter);
                 while (!vInvTx.empty() && nRelayedTransactions < INVENTORY_BROADCAST_MAX_PER_1MB_BLOCK * MaxBlockSize() / 1000000) {
                     // Fetch the top element from the heap
                     std::pop_heap(vInvTx.begin(), vInvTx.end(), compareInvMempoolOrder);
@@ -4746,9 +4749,9 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     vInvTx.pop_back();
                     uint256 hash = *it;
                     // Remove it from the to-be-sent set
-                    pto->setInventoryTxToSend.erase(it);
+                    pto->m_tx_relay.setInventoryTxToSend.erase(it);
                     // Check if not in the filter already
-                    if (pto->filterInventoryKnown.contains(hash)) {
+                    if (pto->m_tx_relay.filterInventoryKnown.contains(hash)) {
                         continue;
                     }
                     // Not in the mempool anymore? don't bother sending it.
@@ -4756,7 +4759,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     if (!txinfo.tx) {
                         continue;
                     }
-                    if (pto->pfilter && !pto->pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
+                    if (pto->m_tx_relay.pfilter && !pto->m_tx_relay.pfilter->IsRelevantAndUpdate(*txinfo.tx)) continue;
                     // Send
                     nRelayedTransactions++;
                     {
@@ -4779,7 +4782,7 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
 
             // Send non-tx/non-block inventory items
             for (const auto& inv : pto->vInventoryOtherToSend) {
-                if (pto->filterInventoryKnown.contains(inv.hash)) {
+                if (pto->m_tx_relay.filterInventoryKnown.contains(inv.hash)) {
                     continue;
                 }
                 queueAndMaybePushInv(inv);

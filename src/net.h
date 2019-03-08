@@ -963,17 +963,12 @@ public:
      */
     std::atomic_bool m_wants_addrv2{false};
     std::atomic_bool fSuccessfullyConnected{false};
+    // Setting fDisconnect to true will cause the node to be disconnected the
+    // next time DisconnectNodes() runs
     std::atomic_bool fDisconnect{false};
     std::atomic<int64_t> nDisconnectLingerTime{0};
     std::atomic_bool fSocketShutdown{false};
-    // Setting fDisconnect to true will cause the node to be disconnected the
-    // next time DisconnectNodes() runs
     std::atomic_bool fOtherSideDisconnected { false };
-    // We use fRelayTxes for two purposes -
-    // a) it allows us to not relay tx invs before receiving the peer's version message
-    // b) the peer may tell us in its version message that we should not relay tx invs
-    //    unless it loads a bloom filter.
-    bool fRelayTxes GUARDED_BY(cs_filter){false};
     bool fSentAddr{false};
     // If 'true' this node will be disconnected on CMasternodeMan::ProcessMasternodeConnections()
     std::atomic<bool> m_masternode_connection{false};
@@ -982,8 +977,6 @@ public:
     // If 'true', we identified it as an intra-quorum relay connection
     std::atomic<bool> m_masternode_iqr_connection{false};
     CSemaphoreGrant grantOutbound;
-    mutable CCriticalSection cs_filter;
-    std::unique_ptr<CBloomFilter> pfilter PT_GUARDED_BY(cs_filter){nullptr};
     std::atomic<int> nRefCount{0};
 
     const uint64_t nKeyedNetGroup;
@@ -1009,11 +1002,6 @@ public:
     int64_t nNextAddrSend GUARDED_BY(cs_sendProcessing){0};
     int64_t nNextLocalAddrSend GUARDED_BY(cs_sendProcessing){0};
 
-    // inventory based relay
-    CRollingBloomFilter filterInventoryKnown GUARDED_BY(cs_inventory);
-    // Set of transaction ids we still have to announce.
-    // They are sorted by the mempool before relay, so the order is not important.
-    std::set<uint256> setInventoryTxToSend;
     // List of block ids we still have announce.
     // There is no final sorting before sending, as they are always sent immediately
     // and in the order requested.
@@ -1021,12 +1009,6 @@ public:
     // List of non-tx/non-block inventory items
     std::vector<CInv> vInventoryOtherToSend;
     CCriticalSection cs_inventory;
-    std::chrono::microseconds nNextInvSend{0};
-    // Used for headers announcements - unfiltered blocks to relay
-    std::vector<uint256> vBlockHashesToAnnounce GUARDED_BY(cs_inventory);
-    // Used for BIP35 mempool sending, also protected by cs_inventory
-    bool fSendMempool GUARDED_BY(cs_inventory){false};
-
     /** UNIX epoch time of the last block received from this peer that we had
      * not yet seen (e.g. not already received from another peer), that passed
      * preliminary validity checks and was saved to disk, even if we don't
@@ -1040,8 +1022,34 @@ public:
      * in CConnman::AttemptToEvictConnection. */
     std::atomic<int64_t> nLastTXTime{0};
 
-    // Last time a "MEMPOOL" request was serviced.
-    std::atomic<int64_t> timeLastMempoolReq{0};
+    struct TxRelay {
+        TxRelay() { }
+        mutable CCriticalSection cs_filter;
+        // We use fRelayTxes for two purposes -
+        // a) it allows us to not relay tx invs before receiving the peer's version message
+        // b) the peer may tell us in its version message that we should not relay tx invs
+        //    unless it loads a bloom filter.
+        bool fRelayTxes GUARDED_BY(cs_filter){false};
+        std::unique_ptr<CBloomFilter> pfilter PT_GUARDED_BY(cs_filter) GUARDED_BY(cs_filter){nullptr};
+
+        mutable CCriticalSection cs_tx_inventory;
+        // inventory based relay
+        CRollingBloomFilter filterInventoryKnown GUARDED_BY(cs_tx_inventory){50000, 0.000001};
+        // Set of transaction ids we still have to announce.
+        // They are sorted by the mempool before relay, so the order is not important.
+        std::set<uint256> setInventoryTxToSend;
+        // Used for BIP35 mempool sending, also protected by cs_tx_inventory
+        bool fSendMempool GUARDED_BY(cs_tx_inventory){false};
+        // Last time a "MEMPOOL" request was serviced.
+        std::atomic<int64_t> timeLastMempoolReq{0};
+        std::chrono::microseconds nNextInvSend{0};
+    };
+
+    TxRelay m_tx_relay;
+
+    // Used for headers announcements - unfiltered blocks to relay
+    std::vector<uint256> vBlockHashesToAnnounce GUARDED_BY(cs_inventory);
+
     // Ping time measurement:
     // The pong reply we're expecting, or 0 if no pong expected.
     std::atomic<uint64_t> nPingNonceSent{0};
@@ -1192,26 +1200,29 @@ public:
     void AddInventoryKnown(const uint256& hash)
     {
         {
-            LOCK(cs_inventory);
-            filterInventoryKnown.insert(hash);
+            LOCK(m_tx_relay.cs_tx_inventory);
+            m_tx_relay.filterInventoryKnown.insert(hash);
         }
     }
 
     void PushInventory(const CInv& inv)
     {
-        LOCK(cs_inventory);
         if (inv.type == MSG_TX || inv.type == MSG_DSTX) {
-            if (!filterInventoryKnown.contains(inv.hash)) {
+            LOCK(m_tx_relay.cs_tx_inventory);
+            if (!m_tx_relay.filterInventoryKnown.contains(inv.hash)) {
                 LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
-                setInventoryTxToSend.insert(inv.hash);
+                m_tx_relay.setInventoryTxToSend.insert(inv.hash);
             } else {
                 LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);
             }
         } else if (inv.type == MSG_BLOCK) {
             LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
+            LOCK(cs_inventory);
             vInventoryBlockToSend.push_back(inv.hash);
         } else {
-            if (!filterInventoryKnown.contains(inv.hash)) {
+            LOCK(cs_inventory);
+            LOCK(m_tx_relay.cs_tx_inventory);
+            if (!m_tx_relay.filterInventoryKnown.contains(inv.hash)) {
                 LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
                 vInventoryOtherToSend.push_back(inv);
             } else {
