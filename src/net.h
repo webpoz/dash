@@ -1045,6 +1045,7 @@ public:
         std::chrono::microseconds nNextInvSend{0};
     };
 
+    // m_tx_relay == nullptr if we're not relaying transactions with this peer
     std::unique_ptr<TxRelay> m_tx_relay;
 
     // Used for headers announcements - unfiltered blocks to relay
