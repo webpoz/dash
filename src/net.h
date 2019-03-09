@@ -69,12 +69,14 @@ static const unsigned int MAX_ADDR_TO_SEND = 1000;
 static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 3 * 1024 * 1024;
 /** Maximum length of the user agent string in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
-/** Maximum number of automatic outgoing nodes */
-static const int MAX_OUTBOUND_CONNECTIONS = 8;
+/** Maximum number of automatic outgoing nodes over which we'll relay everything (blocks, tx, addrs, etc) */
+static const int MAX_OUTBOUND_FULL_RELAY_CONNECTIONS = 8;
 /** Maximum number of addnode outgoing nodes */
 static const int MAX_ADDNODE_CONNECTIONS = 8;
 /** Eviction protection time for incoming connections  */
 static const int INBOUND_EVICTION_PROTECTION_TIME = 1;
+/** Maximum number of block-relay-only outgoing connections */
+static const int MAX_BLOCKS_ONLY_CONNECTIONS = 2;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** The maximum number of peer connections to maintain.
@@ -155,7 +157,8 @@ public:
     {
         ServiceFlags nLocalServices = NODE_NONE;
         int nMaxConnections = 0;
-        int nMaxOutbound = 0;
+        int m_max_outbound_full_relay = 0;
+        int m_max_outbound_block_relay = 0;
         int nMaxAddnode = 0;
         int nMaxFeeler = 0;
         int nBestHeight = 0;
@@ -181,10 +184,12 @@ public:
     void Init(const Options& connOptions) {
         nLocalServices = connOptions.nLocalServices;
         nMaxConnections = connOptions.nMaxConnections;
-        nMaxOutbound = std::min(connOptions.nMaxOutbound, connOptions.nMaxConnections);
+        m_max_outbound_full_relay = std::min(connOptions.m_max_outbound_full_relay, connOptions.nMaxConnections);
+        m_max_outbound_block_relay = connOptions.m_max_outbound_block_relay;
         m_use_addrman_outgoing = connOptions.m_use_addrman_outgoing;
         nMaxAddnode = connOptions.nMaxAddnode;
         nMaxFeeler = connOptions.nMaxFeeler;
+        m_max_outbound = m_max_outbound_full_relay + m_max_outbound_block_relay + nMaxFeeler;
         nBestHeight = connOptions.nBestHeight;
         clientInterface = connOptions.uiInterface;
         m_banman = connOptions.m_banman;
@@ -225,7 +230,7 @@ public:
     bool GetUseAddrmanOutgoing() const { return m_use_addrman_outgoing; };
     void SetNetworkActive(bool active);
     SocketEventsMode GetSocketEventsMode() const { return socketEventsMode; }
-    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, bool fOneShot = false, bool fFeeler = false, bool manual_connection = false, bool masternode_connection = false, bool masternode_probe_connection = false);
+    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, bool fOneShot = false, bool fFeeler = false, bool manual_connection = false, bool block_relay_only = false, bool masternode_connection = false, bool masternode_probe_connection = false);
     void OpenMasternodeConnection(const CAddress& addrConnect, bool probe = false);
     bool CheckIncomingNonce(uint64_t nonce);
 
@@ -386,7 +391,7 @@ public:
     void AddNewAddresses(const std::vector<CAddress>& vAddr, const CAddress& addrFrom, int64_t nTimePenalty = 0);
     std::vector<CAddress> GetAddresses();
 
-    // This allows temporarily exceeding nMaxOutbound, with the goal of finding
+    // This allows temporarily exceeding m_max_outbound_full_relay, with the goal of finding
     // a peer that is better than all our current peers.
     void SetTryNewOutboundPeer(bool flag);
     bool GetTryNewOutboundPeer();
@@ -522,7 +527,7 @@ private:
     CNode* FindNode(const CService& addr, bool fExcludeDisconnecting = true);
 
     bool AttemptToEvictConnection();
-    CNode* ConnectNode(CAddress addrConnect, const char *pszDest = nullptr, bool fCountFailure = false, bool manual_connection = false);
+    CNode* ConnectNode(CAddress addrConnect, const char *pszDest = nullptr, bool fCountFailure = false, bool manual_connection = false, bool block_relay_only = false);
     void AddWhitelistPermissionFlags(NetPermissionFlags& flags, const CNetAddr &addr) const;
 
     void DeleteNode(CNode* pnode);
@@ -602,9 +607,17 @@ private:
     std::unique_ptr<CSemaphore> semOutbound;
     std::unique_ptr<CSemaphore> semAddnode;
     int nMaxConnections;
-    int nMaxOutbound;
+
+    // How many full-relay (tx, block, addr) outbound peers we want
+    int m_max_outbound_full_relay;
+
+    // How many block-relay only outbound peers we want
+    // We do not relay tx or addr messages with these peers
+    int m_max_outbound_block_relay;
+
     int nMaxAddnode;
     int nMaxFeeler;
+    int m_max_outbound;
     bool m_use_addrman_outgoing;
     std::atomic<int> nBestHeight;
     CClientUIInterface* clientInterface;
@@ -652,7 +665,7 @@ private:
     std::thread threadMessageHandler;
 
     /** flag for deciding to connect to an extra outbound peer,
-     *  in excess of nMaxOutbound
+     *  in excess of m_max_outbound_full_relay
      *  This takes the place of a feeler connection */
     std::atomic_bool m_try_another_outbound_peer;
 
@@ -1073,7 +1086,7 @@ public:
 
     std::set<uint256> orphan_work_set;
 
-    CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress &addrBindIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    CNode(NodeId id, ServiceFlags nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nKeyedNetGroupIn, uint64_t nLocalHostNonceIn, const CAddress &addrBindIn, const std::string &addrNameIn = "", bool fInboundIn = false, bool block_relay_only = false);
     ~CNode();
     CNode(const CNode&) = delete;
     CNode& operator=(const CNode&) = delete;
