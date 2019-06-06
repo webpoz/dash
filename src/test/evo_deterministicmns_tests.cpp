@@ -7,12 +7,12 @@
 #include <base58.h>
 #include <chainparams.h>
 #include <consensus/validation.h>
-#include <keystore.h>
 #include <messagesigner.h>
 #include <netbase.h>
 #include <policy/policy.h>
 #include <script/interpreter.h>
 #include <script/sign.h>
+#include <script/signingprovider.h>
 #include <script/standard.h>
 #include <spork.h>
 #include <txmempool.h>

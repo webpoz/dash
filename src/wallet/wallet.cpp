@@ -16,7 +16,6 @@
 #include <interfaces/wallet.h>
 #include <key.h>
 #include <key_io.h>
-#include <keystore.h>
 #include <policy/fees.h>
 #include <policy/policy.h>
 #include <policy/settings.h>
@@ -25,6 +24,7 @@
 #include <script/descriptor.h>
 #include <script/script.h>
 #include <script/sign.h>
+#include <script/signingprovider.h>
 #include <txmempool.h>
 #include <util/bip32.h>
 #include <util/error.h>

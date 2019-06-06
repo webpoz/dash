@@ -13,7 +13,6 @@
 #include <index/txindex.h>
 #include <init.h>
 #include <key_io.h>
-#include <keystore.h>
 #include <merkleblock.h>
 #include <node/coin.h>
 #include <node/context.h>
@@ -28,6 +27,7 @@
 #include <rpc/util.h>
 #include <script/script.h>
 #include <script/sign.h>
+#include <script/signingprovider.h>
 #include <script/standard.h>
 #include <txmempool.h>
 #include <uint256.h>

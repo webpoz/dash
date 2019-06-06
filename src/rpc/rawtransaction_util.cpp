@@ -9,11 +9,11 @@
 #include <core_io.h>
 #include <interfaces/chain.h>
 #include <key_io.h>
-#include <keystore.h>
 #include <policy/policy.h>
 #include <primitives/transaction.h>
 #include <rpc/request.h>
 #include <rpc/util.h>
+#include <script/signingprovider.h>
 #include <univalue.h>
 #include <util/strencodings.h>
 #include <validation.h>

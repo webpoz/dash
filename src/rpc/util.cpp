@@ -4,10 +4,10 @@
 
 #include <chainparamsbase.h>
 #include <key_io.h>
-#include <keystore.h>
 #include <pubkey.h>
 #include <rpc/util.h>
 #include <script/descriptor.h>
+#include <script/signingprovider.h>
 #include <tinyformat.h>
 #include <util/system.h>
 #include <util/strencodings.h>

@@ -7,8 +7,8 @@
 #include <txmempool.h>
 #include <script/standard.h>
 #include <script/sign.h>
+#include <script/signingprovider.h>
 #include <test/util/setup_common.h>
-#include <keystore.h>
 
 #include <boost/test/unit_test.hpp>
 

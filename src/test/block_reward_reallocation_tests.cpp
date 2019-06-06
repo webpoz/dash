@@ -6,12 +6,12 @@
 
 #include <chainparams.h>
 #include <consensus/validation.h>
-#include <keystore.h>
 #include <messagesigner.h>
 #include <miner.h>
 #include <netbase.h>
 #include <script/interpreter.h>
 #include <script/sign.h>
+#include <script/signingprovider.h>
 #include <script/standard.h>
 #include <validation.h>
 
