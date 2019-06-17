@@ -67,14 +67,10 @@ protected:
     mutable CCriticalSection cs_KeyStore;
 
     using KeyMap = std::map<CKeyID, CKey>;
-    using WatchKeyMap = std::map<CKeyID, CPubKey>;
     using ScriptMap = std::map<CScriptID, CScript>;
-    using WatchOnlySet = std::set<CScript>;
 
     KeyMap mapKeys GUARDED_BY(cs_KeyStore);
-    WatchKeyMap mapWatchKeys GUARDED_BY(cs_KeyStore);
     ScriptMap mapScripts GUARDED_BY(cs_KeyStore);
-    WatchOnlySet setWatchOnly GUARDED_BY(cs_KeyStore);
     /* the HD chain data model*/
     CHDChain hdChain GUARDED_BY(cs_KeyStore);
 
@@ -89,11 +85,6 @@ public:
     virtual bool HaveCScript(const CScriptID &hash) const override;
     virtual std::set<CScriptID> GetCScripts() const;
     virtual bool GetCScript(const CScriptID &hash, CScript& redeemScriptOut) const override;
-
-    virtual bool AddWatchOnly(const CScript &dest);
-    virtual bool RemoveWatchOnly(const CScript &dest);
-    virtual bool HaveWatchOnly(const CScript &dest) const;
-    virtual bool HaveWatchOnly() const;
 
     virtual bool GetHDChain(CHDChain& hdChainRet) const;
 };

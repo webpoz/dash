@@ -73,12 +73,6 @@ bool FillableSigningProvider::GetPubKey(const CKeyID &address, CPubKey &vchPubKe
 {
     CKey key;
     if (!GetKey(address, key)) {
-        LOCK(cs_KeyStore);
-        WatchKeyMap::const_iterator it = mapWatchKeys.find(address);
-        if (it != mapWatchKeys.end()) {
-            vchPubKeyOut = it->second;
-            return true;
-        }
         return false;
     }
     vchPubKeyOut = key.GetPubKey();
@@ -155,45 +149,6 @@ bool FillableSigningProvider::GetCScript(const CScriptID &hash, CScript& redeemS
         return true;
     }
     return false;
-}
-
-static bool ExtractPubKey(const CScript &dest, CPubKey& pubKeyOut)
-{
-    std::vector<std::vector<unsigned char>> solutions;
-    return Solver(dest, solutions) == TX_PUBKEY &&
-        (pubKeyOut = CPubKey(solutions[0])).IsFullyValid();
-}
-
-bool FillableSigningProvider::AddWatchOnly(const CScript &dest)
-{
-    LOCK(cs_KeyStore);
-    setWatchOnly.insert(dest);
-    CPubKey pubKey;
-    if (ExtractPubKey(dest, pubKey))
-        mapWatchKeys[pubKey.GetID()] = pubKey;
-    return true;
-}
-
-bool FillableSigningProvider::RemoveWatchOnly(const CScript &dest)
-{
-    LOCK(cs_KeyStore);
-    setWatchOnly.erase(dest);
-    CPubKey pubKey;
-    if (ExtractPubKey(dest, pubKey))
-        mapWatchKeys.erase(pubKey.GetID());
-    return true;
-}
-
-bool FillableSigningProvider::HaveWatchOnly(const CScript &dest) const
-{
-    LOCK(cs_KeyStore);
-    return setWatchOnly.count(dest) > 0;
-}
-
-bool FillableSigningProvider::HaveWatchOnly() const
-{
-    LOCK(cs_KeyStore);
-    return (!setWatchOnly.empty());
 }
 
 bool FillableSigningProvider::GetHDChain(CHDChain& hdChainRet) const

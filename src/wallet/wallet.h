@@ -784,6 +784,8 @@ private:
     bool fOnlyMixingAllowed;
 
     using CryptedKeyMap = std::map<CKeyID, std::pair<CPubKey, std::vector<unsigned char>>>;
+    using WatchOnlySet = std::set<CScript>;
+    using WatchKeyMap = std::map<CKeyID, CPubKey>;
 
     bool SetCrypted();
 
@@ -797,6 +799,8 @@ private:
 
     bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly = false, bool accept_no_keys = false);
     CryptedKeyMap mapCryptedKeys GUARDED_BY(cs_KeyStore);
+    WatchOnlySet setWatchOnly GUARDED_BY(cs_KeyStore);
+    WatchKeyMap mapWatchKeys GUARDED_BY(cs_KeyStore);
 
     bool HaveKeyInner(const CKeyID &address) const;
     bool AddCryptedKeyInner(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
@@ -889,7 +893,8 @@ private:
      * of the other AddWatchOnly which accepts a timestamp and sets
      * nTimeFirstKey more intelligently for more efficient rescans.
      */
-    bool AddWatchOnly(const CScript& dest) override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool AddWatchOnly(const CScript& dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool AddWatchOnlyInMem(const CScript &dest);
 
     /** Interface for accessing chain state. */
     interfaces::Chain* m_chain;
@@ -1145,9 +1150,15 @@ public:
     //! Adds a watch-only address to the store, and saves it to disk.
     bool AddWatchOnly(const CScript& dest, int64_t nCreateTime) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool AddWatchOnlyWithDB(WalletBatch &batch, const CScript& dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
-    bool RemoveWatchOnly(const CScript &dest) override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool RemoveWatchOnly(const CScript &dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     //! Adds a watch-only address to the store, without saving it to disk (used by LoadWallet)
     bool LoadWatchOnly(const CScript &dest);
+    //! Returns whether the watch-only script is in the wallet
+    bool HaveWatchOnly(const CScript &dest) const;
+    //! Returns whether there are any watch-only things in the wallet
+    bool HaveWatchOnly() const;
+    //! Fetches a pubkey from mapWatchKeys if it exists there
+    bool GetWatchPubKey(const CKeyID &address, CPubKey &pubkey_out) const;
 
     //! Adds a key to the store, and saves it to disk.
     bool AddKeyPubKeyWithDB(WalletBatch &batch,const CKey& key, const CPubKey &pubkey) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
