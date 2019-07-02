@@ -1035,10 +1035,7 @@ UniValue addmultisigaddress(const JSONRPCRequest& request)
 
     // Construct using pay-to-script-hash:
     CScript inner;
-    CTxDestination dest = AddAndGetMultisigDestination(required, pubkeys, inner);
-
-    spk_man.AddCScript(inner);
-
+    CTxDestination dest = AddAndGetMultisigDestination(required, pubkeys, spk_man, inner);
     pwallet->SetAddressBook(dest, label, "send");
 
     UniValue result(UniValue::VOBJ);
