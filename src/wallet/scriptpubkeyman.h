@@ -132,6 +132,24 @@ protected:
 
 public:
     ScriptPubKeyMan(WalletStorage& storage) : m_storage(storage) {}
+
+    virtual ~ScriptPubKeyMan() {};
+    virtual isminetype IsMine(const CScript& script) const { return ISMINE_NO; }
+    virtual isminetype IsMine(const CTxDestination& dest) const { return ISMINE_NO; }
+
+    //! Upgrade stored CKeyMetadata objects to store key origin info as KeyOriginInfo
+    virtual void UpgradeKeyMetadata() {}
+
+    /* Returns true if HD is enabled */
+    virtual bool IsHDEnabled() const { return false; }
+
+    /* Returns true if the wallet can give out new addresses. This means it has keys in the keypool or can generate new keys */
+    virtual bool CanGetAddresses(bool internal = false) { return false; }
+
+    virtual int64_t GetOldestKeyPoolTime() { return GetTime(); }
+
+    virtual size_t KeypoolCountExternalKeys() { return 0; }
+    virtual size_t KeypoolCountInternalKeys() { return 0; }
 };
 
 class LegacyScriptPubKeyMan : public ScriptPubKeyMan, public FillableSigningProvider
@@ -212,27 +230,25 @@ private:
 public:
     bool GetNewDestination(const std::string label, CTxDestination& dest, std::string& error);
 
-    isminetype IsMine(const CScript& script) const;
-    isminetype IsMine(const CTxDestination& dest) const;
+    isminetype IsMine(const CScript& script) const override;
+    isminetype IsMine(const CTxDestination& dest) const override;
 
     //! will encrypt previously unencrypted keys
     bool EncryptKeys(CKeyingMaterial& vMasterKeyIn);
     //! Upgrade stored CKeyMetadata objects to store key origin info as KeyOriginInfo
-    void UpgradeKeyMetadata() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    void UpgradeKeyMetadata() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) override;
 
     /* Returns true if HD is enabled */
-    bool IsHDEnabled() const;
+    bool IsHDEnabled() const override;
 
-    int64_t GetOldestKeyPoolTime();
-    size_t KeypoolCountExternalKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
-    size_t KeypoolCountInternalKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    int64_t GetOldestKeyPoolTime() override;
+    size_t KeypoolCountExternalKeys() override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    size_t KeypoolCountInternalKeys() override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     //! Fetches a key from the keypool
     bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
 
-    /* Returns true if the wallet can give out new addresses. This means it has keys in the keypool or can generate new keys */
-    bool CanGetAddresses(bool internal = false);
-
+    bool CanGetAddresses(bool internal = false) override;
 
     // Map from Key ID to key metadata.
     std::map<CKeyID, CKeyMetadata> mapKeyMetadata GUARDED_BY(cs_wallet);
@@ -290,6 +306,7 @@ public:
     //! Fetches a pubkey from mapWatchKeys if it exists there
     bool GetWatchPubKey(const CKeyID &address, CPubKey &pubkey_out) const;
 
+    /* SigningProvider overrides */
     //! HaveKey implementation that also checks the mapHdPubKeys
     bool HaveKey(const CKeyID &address) const override;
     //! GetKey implementation that can derive a HD private key on the fly
