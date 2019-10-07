@@ -132,6 +132,7 @@ public:
         node.mempool = std::make_unique<CTxMemPool>(&::feeEstimator);
         chain = interfaces::MakeChain(node);
         wallet = std::make_unique<CWallet>(chain.get(), "", CreateMockWalletDatabase());
+        wallet->SetupLegacyScriptPubKeyMan();
         bool firstRun;
         wallet->LoadWallet(firstRun);
         AddWallet(wallet);
@@ -181,7 +182,10 @@ public:
         int nChangePosRet = -1;
         bilingual_str strError;
         CCoinControl coinControl;
-        BOOST_CHECK(reserveDest.GetReservedDestination(tallyItem.txdest, false));
+        {
+            LOCK(wallet->cs_wallet);
+            BOOST_CHECK(reserveDest.GetReservedDestination(tallyItem.txdest, false));
+        }
         for (CAmount nAmount : vecAmounts) {
             BOOST_CHECK(wallet->CreateTransaction({{GetScriptForDestination(tallyItem.txdest), nAmount, false}}, tx, nFeeRet, nChangePosRet, strError, coinControl));
             {

@@ -73,9 +73,8 @@ static CMutableTransaction TestSimpleSpend(const CTransaction& from, uint32_t in
 
 static void AddKey(CWallet& wallet, const CKey& key)
 {
-    auto spk_man = wallet.GetLegacyScriptPubKeyMan();
-    LOCK(wallet.cs_wallet);
-    AssertLockHeld(spk_man->cs_wallet);
+    auto spk_man = wallet.GetOrCreateLegacyScriptPubKeyMan();
+    LOCK2(wallet.cs_wallet, spk_man->cs_KeyStore);
     spk_man->AddKeyPubKey(key, key.GetPubKey());
 }
 
@@ -94,6 +93,7 @@ BOOST_FIXTURE_TEST_CASE(scan_for_wallet_transactions, TestChain100Setup)
     // Verify ScanForWalletTransactions accommodates a null start block.
     {
         CWallet wallet(chain.get(), "", CreateDummyWalletDatabase());
+        wallet.SetupLegacyScriptPubKeyMan();
         {
             LOCK(wallet.cs_wallet);
             wallet.SetLastBlockProcessed(::ChainActive().Height(), ::ChainActive().Tip()->GetBlockHash());
@@ -204,6 +204,7 @@ BOOST_FIXTURE_TEST_CASE(importmulti_rescan, TestChain100Setup)
     // after.
     {
         std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "", CreateDummyWalletDatabase());
+        wallet->SetupLegacyScriptPubKeyMan();
         AddWallet(wallet);
         UniValue keys;
         keys.setArray();
@@ -268,9 +269,8 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup)
     // Import key into wallet and call dumpwallet to create backup file.
     {
         std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "", CreateDummyWalletDatabase());
-        auto spk_man = wallet->GetLegacyScriptPubKeyMan();
-        LOCK(wallet->cs_wallet);
-        AssertLockHeld(spk_man->cs_wallet);
+        auto spk_man = wallet->GetOrCreateLegacyScriptPubKeyMan();
+        LOCK2(wallet->cs_wallet, spk_man->cs_KeyStore);
         spk_man->mapKeyMetadata[coinbaseKey.GetPubKey().GetID()].nCreateTime = KEY_TIME;
         spk_man->AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
 
@@ -287,6 +287,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChain100Setup)
     // were scanned, and no prior blocks were scanned.
     {
         std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "", CreateDummyWalletDatabase());
+        wallet->SetupLegacyScriptPubKeyMan();
 
         CoreContext context{m_node};
         JSONRPCRequest request(context);
@@ -316,6 +317,7 @@ BOOST_FIXTURE_TEST_CASE(rpc_getaddressinfo, TestChain100Setup)
     auto chain = interfaces::MakeChain(node);
 
     std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "", CreateMockWalletDatabase());
+    wallet->SetupLegacyScriptPubKeyMan();
     AddWallet(wallet);
     CoreContext context{m_node};
     JSONRPCRequest request(context);
@@ -397,11 +399,10 @@ BOOST_FIXTURE_TEST_CASE(coin_mark_dirty_immature_credit, TestChain100Setup)
     auto chain = interfaces::MakeChain(node);
 
     CWallet wallet(chain.get(), "", CreateDummyWalletDatabase());
-    auto spk_man = wallet.GetLegacyScriptPubKeyMan();
+    auto spk_man = wallet.GetOrCreateLegacyScriptPubKeyMan();
     CWalletTx wtx(&wallet, m_coinbase_txns.back());
 
-    LOCK(wallet.cs_wallet);
-    AssertLockHeld(spk_man->cs_wallet);
+    LOCK2(wallet.cs_wallet, spk_man->cs_KeyStore);
     wallet.SetLastBlockProcessed(::ChainActive().Height(), ::ChainActive().Tip()->GetBlockHash());
 
     CWalletTx::Confirmation confirm(CWalletTx::Status::CONFIRMED, ::ChainActive().Height(), ::ChainActive().Tip()->GetBlockHash(), 0);
@@ -411,7 +412,7 @@ BOOST_FIXTURE_TEST_CASE(coin_mark_dirty_immature_credit, TestChain100Setup)
     // cache the current immature credit amount, which is 0.
     BOOST_CHECK_EQUAL(wtx.GetImmatureCredit(), 0);
 
-    // Invalidate the cached vanue, add the key, and make sure a new immature
+    // Invalidate the cached value, add the key, and make sure a new immature
     // credit amount is calculated.
     wtx.MarkDirty();
     BOOST_CHECK(spk_man->AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey()));
@@ -503,7 +504,7 @@ static void TestWatchOnlyPubKey(LegacyScriptPubKeyMan* spk_man, const CPubKey& a
     CScript p2pk = GetScriptForRawPubKey(add_pubkey);
     CKeyID add_address = add_pubkey.GetID();
     CPubKey found_pubkey;
-    LOCK(spk_man->cs_wallet);
+    LOCK(spk_man->cs_KeyStore);
 
     // all Scripts (i.e. also all PubKeys) are added to the general watch-only set
     BOOST_CHECK(!spk_man->HaveWatchOnly(p2pk));
@@ -520,7 +521,6 @@ static void TestWatchOnlyPubKey(LegacyScriptPubKeyMan* spk_man, const CPubKey& a
         BOOST_CHECK(found_pubkey == CPubKey()); // passed key is unchanged
     }
 
-    AssertLockHeld(spk_man->cs_wallet);
     spk_man->RemoveWatchOnly(p2pk);
     BOOST_CHECK(!spk_man->HaveWatchOnly(p2pk));
 
@@ -545,7 +545,7 @@ BOOST_AUTO_TEST_CASE(WatchOnlyPubKeys)
 {
     CKey key;
     CPubKey pubkey;
-    LegacyScriptPubKeyMan* spk_man = m_wallet.GetLegacyScriptPubKeyMan();
+    LegacyScriptPubKeyMan* spk_man = m_wallet.GetOrCreateLegacyScriptPubKeyMan();
 
     BOOST_CHECK(!spk_man->HaveWatchOnly());
 
@@ -1197,6 +1197,7 @@ BOOST_FIXTURE_TEST_CASE(wallet_disableprivkeys, TestChain100Setup)
     node.mempool = std::make_unique<CTxMemPool>(&::feeEstimator);
     auto chain = interfaces::MakeChain(node);
     std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "", CreateDummyWalletDatabase());
+    wallet->SetupLegacyScriptPubKeyMan();
     wallet->SetMinVersion(FEATURE_LATEST);
     wallet->SetWalletFlag(WALLET_FLAG_DISABLE_PRIVATE_KEYS);
     BOOST_CHECK(!wallet->TopUpKeyPool(1000));
