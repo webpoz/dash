@@ -164,6 +164,7 @@ public:
 
     virtual size_t KeypoolCountExternalKeys() { return 0; }
     virtual size_t KeypoolCountInternalKeys() { return 0; }
+    virtual unsigned int GetKeyPoolSize() const { return 0; }
 
     virtual const CKeyMetadata* GetMetadata(uint160 id) const { return nullptr; }
 };
@@ -275,6 +276,7 @@ public:
 
     //! Fetches a key from the keypool
     bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
+    unsigned int GetKeyPoolSize() const override;
 
     const CKeyMetadata* GetMetadata(uint160 id) const override;
 

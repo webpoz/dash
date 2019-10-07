@@ -731,6 +731,12 @@ size_t LegacyScriptPubKeyMan::KeypoolCountInternalKeys()
     return setInternalKeyPool.size();
 }
 
+unsigned int LegacyScriptPubKeyMan::GetKeyPoolSize() const
+{
+    AssertLockHeld(cs_wallet);
+    return setInternalKeyPool.size() + setExternalKeyPool.size();
+}
+
 const CKeyMetadata* LegacyScriptPubKeyMan::GetMetadata(uint160 id) const
 {
     AssertLockHeld(cs_wallet);
