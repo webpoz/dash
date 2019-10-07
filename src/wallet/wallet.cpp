@@ -116,6 +116,7 @@ bool AddWallet(const std::shared_ptr<CWallet>& wallet)
         if (i != vpwallets.end()) return false;
         vpwallets.push_back(wallet);
     }
+    wallet->ConnectScriptPubKeyManNotifiers();
     coinJoinClientManagers.emplace(std::make_pair(wallet->GetName(), std::make_shared<CCoinJoinClientManager>(*wallet, ::masternodeSync)));
     g_wallet_init_interface.InitCoinJoinSettings();
     return true;
@@ -5162,6 +5163,14 @@ const CKeyingMaterial& CWallet::GetEncryptionKey() const
 bool CWallet::HasEncryptionKeys() const
 {
     return !mapMasterKeys.empty();
+}
+
+void CWallet::ConnectScriptPubKeyManNotifiers()
+{
+    for (const auto& spk_man : GetActiveScriptPubKeyMans()) {
+        spk_man->NotifyWatchonlyChanged.connect(NotifyWatchonlyChanged);
+        spk_man->NotifyCanGetAddressesChanged.connect(NotifyCanGetAddressesChanged);
+    }
 }
 
 bool CWallet::GenerateNewHDChainEncrypted(const SecureString& secureMnemonic, const SecureString& secureMnemonicPassphrase, const SecureString& secureWalletPassphrase)
