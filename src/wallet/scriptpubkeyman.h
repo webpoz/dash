@@ -155,6 +155,8 @@ public:
     /* Returns true if the wallet can give out new addresses. This means it has keys in the keypool or can generate new keys */
     virtual bool CanGetAddresses(bool internal = false) { return false; }
 
+    virtual bool HavePrivateKeys() const { return false; }
+
     virtual int64_t GetOldestKeyPoolTime() { return GetTime(); }
 
     virtual size_t KeypoolCountExternalKeys() { return 0; }
@@ -259,6 +261,8 @@ public:
 
     /* Returns true if HD is enabled */
     bool IsHDEnabled() const override;
+
+    bool HavePrivateKeys() const override;
 
     int64_t GetOldestKeyPoolTime() override;
     size_t KeypoolCountExternalKeys() override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);

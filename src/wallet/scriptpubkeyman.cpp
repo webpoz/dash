@@ -666,7 +666,18 @@ bool LegacyScriptPubKeyMan::CanGetAddresses(bool internal)
     return keypool_has_keys;
 }
 
+
+bool LegacyScriptPubKeyMan::HavePrivateKeys() const
+{
+    LOCK(cs_KeyStore);
+    return !mapKeys.empty() || !mapCryptedKeys.empty();
+}
+
 static int64_t GetOldestKeyInPool(const std::set<int64_t>& setKeyPool, WalletBatch& batch) {
+    if (setKeyPool.empty()) {
+        return GetTime();
+    }
+
     CKeyPool keypool;
     int64_t nIndex = *(setKeyPool.begin());
     if (!batch.ReadPool(nIndex, keypool)) {
