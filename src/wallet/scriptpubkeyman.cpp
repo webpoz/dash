@@ -12,9 +12,8 @@
 #include <wallet/scriptpubkeyman.h>
 #include <wallet/wallet.h>
 
-bool LegacyScriptPubKeyMan::GetNewDestination(const std::string label, CTxDestination& dest, std::string& error)
+bool LegacyScriptPubKeyMan::GetNewDestination(CTxDestination& dest, std::string& error)
 {
-    LOCK(cs_wallet);
     error.clear();
     TopUpKeyPool();
 
@@ -26,8 +25,6 @@ bool LegacyScriptPubKeyMan::GetNewDestination(const std::string label, CTxDestin
     }
     //LearnRelatedScripts(new_key);
     dest = new_key.GetID();
-
-    m_wallet.SetAddressBook(dest, label, "receive");
     return true;
 }
 

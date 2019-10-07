@@ -3743,12 +3743,17 @@ bool CWallet::TopUpKeyPool(unsigned int kpSize)
 
 bool CWallet::GetNewDestination(const std::string label, CTxDestination& dest, std::string& error)
 {
+    LOCK(cs_wallet);
     error.clear();
     bool result = false;
     auto spk_man = m_spk_man.get();
     if (spk_man) {
-        result = spk_man->GetNewDestination(label, dest, error);
+        result = spk_man->GetNewDestination(dest, error);
     }
+    if (result) {
+        SetAddressBook(dest, label, "receive");
+    }
+
     return result;
 }
 
