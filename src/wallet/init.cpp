@@ -17,6 +17,7 @@
 #include <util/translation.h>
 #include <validation.h>
 #include <walletinitinterface.h>
+#include <wallet/scriptpubkeyman.h>
 #include <wallet/wallet.h>
 
 #include <coinjoin/client.h>
