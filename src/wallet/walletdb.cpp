@@ -230,7 +230,7 @@ public:
 
 static bool
 ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
-             CWalletScanState &wss, std::string& strType, std::string& strErr, const KeyFilterFn& filter_fn = nullptr) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet, pwallet->GetLegacyScriptPubKeyMan()->cs_wallet)
+             CWalletScanState &wss, std::string& strType, std::string& strErr, const KeyFilterFn& filter_fn = nullptr) EXCLUSIVE_LOCKS_REQUIRED(pwallet->cs_wallet)
 {
     try {
         // Unserialize
@@ -507,7 +507,6 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, st
 {
     CWalletScanState dummy_wss;
     LOCK(pwallet->cs_wallet);
-    AssertLockHeld(pwallet->GetLegacyScriptPubKeyMan()->cs_wallet);
     return ReadKeyValue(pwallet, ssKey, ssValue, dummy_wss, strType, strErr, filter_fn);
 }
 
@@ -525,7 +524,6 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     DBErrors result = DBErrors::LOAD_OK;
 
     LOCK(pwallet->cs_wallet);
-    AssertLockHeld(pwallet->GetLegacyScriptPubKeyMan()->cs_wallet);
     try {
         int nMinVersion = 0;
         if (m_batch->Read(DBKeys::MINVERSION, nMinVersion)) {
@@ -612,7 +610,7 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     if ((wss.nKeys + wss.nCKeys + wss.nWatchKeys + wss.nHDPubKeys) != wss.nKeyMeta) {
         auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
         if (spk_man) {
-            AssertLockHeld(spk_man->cs_wallet);
+            LOCK(spk_man->cs_KeyStore);
             spk_man->UpdateTimeFirstKey(1);
         }
     }
@@ -633,11 +631,7 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     // Upgrade all of the wallet keymetadata to have the hd master key id
     // This operation is not atomic, but if it fails, updated entries are still backwards compatible with older software
     try {
-        auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
-        if (spk_man) {
-            AssertLockHeld(spk_man->cs_wallet);
-            spk_man->UpgradeKeyMetadata();
-        }
+        pwallet->UpgradeKeyMetadata();
     } catch (...) {
         result = DBErrors::CORRUPT;
     }

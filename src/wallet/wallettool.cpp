@@ -23,6 +23,7 @@ static void WalletToolReleaseWallet(CWallet* wallet)
 
 static void WalletCreate(CWallet* wallet_instance)
 {
+    LOCK(wallet_instance->cs_wallet);
     wallet_instance->SetMinVersion(FEATURE_COMPRPUBKEY);
 
     // generate a new HD seed
