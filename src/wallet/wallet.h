@@ -1295,7 +1295,6 @@ public:
     int64_t& nTimeFirstKey GUARDED_BY(cs_wallet) = m_spk_man->nTimeFirstKey;
     std::map<CKeyID, CKeyMetadata>& mapKeyMetadata GUARDED_BY(cs_wallet) = m_spk_man->mapKeyMetadata;
     std::map<CScriptID, CKeyMetadata>& m_script_metadata GUARDED_BY(cs_wallet) = m_spk_man->m_script_metadata;
-    void MarkReserveKeysAsUsed(int64_t keypool_id) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(m_spk_man->cs_wallet); m_spk_man->MarkReserveKeysAsUsed(keypool_id); }
     using CryptedKeyMap = LegacyScriptPubKeyMan::CryptedKeyMap;
 };
 

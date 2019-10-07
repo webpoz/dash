@@ -288,6 +288,37 @@ bool LegacyScriptPubKeyMan::TopUp(unsigned int size)
     return TopUpKeyPool(size);
 }
 
+void LegacyScriptPubKeyMan::MarkUnusedAddresses(WalletBatch &batch, const CScript& script, const uint256& hashBlock)
+{
+    AssertLockHeld(cs_wallet);
+    // extract addresses and check if they match with an unused keypool key
+    for (const auto& keyid : GetAffectedKeys(script, *this)) {
+        std::map<CKeyID, int64_t>::const_iterator mi = m_pool_key_to_index.find(keyid);
+        if (mi != m_pool_key_to_index.end()) {
+            WalletLogPrintf("%s: Detected a used keypool key, mark all keypool key up to this key as used\n", __func__);
+            MarkReserveKeysAsUsed(mi->second);
+
+            if (!TopUpKeyPool()) {
+                WalletLogPrintf("%s: Topping up keypool failed (locked wallet)\n", __func__);
+            }
+        }
+        if (!hashBlock.IsNull()) {
+            int64_t block_time;
+            bool found_block = m_wallet.chain().findBlock(hashBlock, nullptr /* block */, &block_time);
+            assert(found_block);
+            if (mapKeyMetadata[keyid].nCreateTime > block_time) {
+                WalletLogPrintf("%s: Found a key which appears to be used earlier than we expected, updating metadata\n", __func__);
+                CPubKey vchPubKey;
+                bool res = GetPubKey(keyid, vchPubKey);
+                assert(res); // this should never fail
+                mapKeyMetadata[keyid].nCreateTime = block_time;
+                batch.WriteKeyMetadata(mapKeyMetadata[keyid], vchPubKey, true);
+                UpdateTimeFirstKey(block_time);
+            }
+        }
+    }
+}
+
 void LegacyScriptPubKeyMan::UpgradeKeyMetadata()
 {
     AssertLockHeld(cs_wallet); // mapKeyMetadata
