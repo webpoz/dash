@@ -166,6 +166,8 @@ public:
     virtual size_t KeypoolCountInternalKeys() { return 0; }
     virtual unsigned int GetKeyPoolSize() const { return 0; }
 
+    virtual int64_t GetTimeFirstKey() const { return 0; }
+
     virtual const CKeyMetadata* GetMetadata(uint160 id) const { return nullptr; }
 };
 
@@ -278,6 +280,8 @@ public:
     bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
     unsigned int GetKeyPoolSize() const override;
 
+    int64_t GetTimeFirstKey() const override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+
     const CKeyMetadata* GetMetadata(uint160 id) const override;
 
     bool CanGetAddresses(bool internal = false) override;
@@ -365,8 +369,6 @@ public:
 
     /* Returns true if the wallet can generate new keys */
     bool CanGenerateKeys();
-
-    int64_t GetTimeFirstKey() const EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     //! Adds a HDPubKey into the wallet(database)
     bool AddHDPubKey(WalletBatch &batch, const CExtPubKey &extPubKey, bool fInternal);

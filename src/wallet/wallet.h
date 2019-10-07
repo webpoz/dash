@@ -1286,9 +1286,6 @@ public:
     LegacyScriptPubKeyMan::WatchKeyMap& mapWatchKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapWatchKeys;
     LegacyScriptPubKeyMan::HDPubKeyMap& mapHdPubKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapHdPubKeys;
     WalletBatch*& encrypted_batch GUARDED_BY(cs_wallet) = m_spk_man->encrypted_batch;
-    int64_t& nTimeFirstKey GUARDED_BY(cs_wallet) = m_spk_man->nTimeFirstKey;
-    std::map<CKeyID, CKeyMetadata>& mapKeyMetadata GUARDED_BY(cs_wallet) = m_spk_man->mapKeyMetadata;
-    std::map<CScriptID, CKeyMetadata>& m_script_metadata GUARDED_BY(cs_wallet) = m_spk_man->m_script_metadata;
     using CryptedKeyMap = LegacyScriptPubKeyMan::CryptedKeyMap;
 };
 

@@ -737,6 +737,12 @@ unsigned int LegacyScriptPubKeyMan::GetKeyPoolSize() const
     return setInternalKeyPool.size() + setExternalKeyPool.size();
 }
 
+int64_t LegacyScriptPubKeyMan::GetTimeFirstKey() const
+{
+    AssertLockHeld(cs_wallet);
+    return nTimeFirstKey;
+}
+
 const CKeyMetadata* LegacyScriptPubKeyMan::GetMetadata(uint160 id) const
 {
     AssertLockHeld(cs_wallet);
@@ -766,12 +772,6 @@ void LegacyScriptPubKeyMan::UpdateTimeFirstKey(int64_t nCreateTime)
     } else if (!nTimeFirstKey || nCreateTime < nTimeFirstKey) {
         nTimeFirstKey = nCreateTime;
     }
-}
-
-int64_t LegacyScriptPubKeyMan::GetTimeFirstKey() const
-{
-    AssertLockHeld(cs_wallet);
-    return nTimeFirstKey;
 }
 
 bool LegacyScriptPubKeyMan::LoadKey(const CKey& key, const CPubKey &pubkey)

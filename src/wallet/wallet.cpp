@@ -4531,8 +4531,13 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
         // our wallet birthday (as adjusted for block time variability)
         // unless a full rescan was requested
         if (gArgs.GetArg("-rescan", 0) != 2) {
-            if (walletInstance->nTimeFirstKey) {
-                if (Optional<int> first_block = chain.findFirstBlockWithTimeAndHeight(walletInstance->nTimeFirstKey - TIMESTAMP_WINDOW, rescan_height, nullptr)) {
+            Optional<int64_t> time_first_key;
+            if (auto spk_man = walletInstance->m_spk_man.get()) {
+                int64_t time = spk_man->GetTimeFirstKey();
+                if (!time_first_key || time < *time_first_key) time_first_key = time;
+            }
+            if (time_first_key) {
+                if (Optional<int> first_block = chain.findFirstBlockWithTimeAndHeight(*time_first_key - TIMESTAMP_WINDOW, rescan_height, nullptr)) {
                     rescan_height = *first_block;
                 }
             }
@@ -4562,7 +4567,7 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
         walletInstance->WalletLogPrintf("setInternalKeyPool.size() = %u\n",   walletInstance->KeypoolCountInternalKeys());
         walletInstance->WalletLogPrintf("mapWallet.size() = %u\n",            walletInstance->mapWallet.size());
         walletInstance->WalletLogPrintf("mapAddressBook.size() = %u\n",       walletInstance->mapAddressBook.size());
-        walletInstance->WalletLogPrintf("nTimeFirstKey = %u\n",               walletInstance->nTimeFirstKey);
+        walletInstance->WalletLogPrintf("nTimeFirstKey = %u\n",               walletInstance->m_spk_man->GetTimeFirstKey());
     }
 
     return walletInstance;
