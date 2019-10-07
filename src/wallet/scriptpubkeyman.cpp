@@ -336,8 +336,6 @@ void LegacyScriptPubKeyMan::UpgradeKeyMetadata()
             }
         }
     }
-    batch.reset(); //write before setting the flag
-    m_storage.SetWalletFlag(WALLET_FLAG_KEY_ORIGIN_METADATA);
 }
 
 void LegacyScriptPubKeyMan::GenerateNewHDChain(const SecureString& secureMnemonic, const SecureString& secureMnemonicPassphrase)
