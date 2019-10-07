@@ -1331,12 +1331,14 @@ bool LegacyScriptPubKeyMan::TopUpKeyPool(unsigned int kpSize)
     return true;
 }
 
+/*
 void LegacyScriptPubKeyMan::AddKeypoolPubkey(const CPubKey& pubkey, const bool internal)
 {
     WalletBatch batch(m_storage.GetDatabase());
     AddKeypoolPubkeyWithDB(pubkey, internal, batch);
     NotifyCanGetAddressesChanged();
 }
+*/
 
 void LegacyScriptPubKeyMan::AddKeypoolPubkeyWithDB(const CPubKey& pubkey, const bool internal, WalletBatch& batch)
 {
