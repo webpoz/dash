@@ -154,6 +154,8 @@ public:
 
     virtual size_t KeypoolCountExternalKeys() { return 0; }
     virtual size_t KeypoolCountInternalKeys() { return 0; }
+
+    virtual const CKeyMetadata* GetMetadata(uint160 id) const { return nullptr; }
 };
 
 class LegacyScriptPubKeyMan : public ScriptPubKeyMan, public FillableSigningProvider
@@ -257,6 +259,8 @@ public:
 
     //! Fetches a key from the keypool
     bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
+
+    const CKeyMetadata* GetMetadata(uint160 id) const override;
 
     bool CanGetAddresses(bool internal = false) override;
 
