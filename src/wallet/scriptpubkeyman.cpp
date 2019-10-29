@@ -441,7 +441,7 @@ bool LegacyScriptPubKeyMan::SetHDChain(WalletBatch &batch, const CHDChain& chain
             throw std::runtime_error(std::string(__func__) + ": WriteHDChain failed");
         }
 
-        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
     }
 
     return true;
@@ -462,7 +462,7 @@ bool LegacyScriptPubKeyMan::SetCryptedHDChain(WalletBatch &batch, const CHDChain
             if (!batch.WriteCryptedHDChain(chain))
                 throw std::runtime_error(std::string(__func__) + ": WriteCryptedHDChain failed");
         }
-        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
     }
 
     return true;
@@ -742,7 +742,7 @@ bool LegacyScriptPubKeyMan::AddKeyPubKeyWithDB(WalletBatch& batch, const CKey& s
                                  secret.GetPrivKey(),
                                  mapKeyMetadata[pubkey.GetID()]);
     }
-    m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+    m_storage.UnsetBlankWalletFlag(batch);
     return true;
 }
 
@@ -952,7 +952,7 @@ bool LegacyScriptPubKeyMan::AddWatchOnlyWithDB(WalletBatch &batch, const CScript
     UpdateTimeFirstKey(meta.nCreateTime);
     NotifyWatchonlyChanged(true);
     if (batch.WriteWatchOnly(dest, meta)) {
-        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_storage.UnsetBlankWalletFlag(batch);
         return true;
     }
     return false;
@@ -1035,7 +1035,7 @@ bool LegacyScriptPubKeyMan::AddHDPubKey(WalletBatch &batch, const CExtPubKey &ex
     if (!batch.WriteHDPubKey(hdPubKey, mapKeyMetadata[extPubKey.pubkey.GetID()])) {
         return false;
     }
-    m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+    m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
     return true;
 }
 
@@ -1518,7 +1518,7 @@ bool LegacyScriptPubKeyMan::AddCScriptWithDB(WalletBatch& batch, const CScript& 
     if (!FillableSigningProvider::AddCScript(redeemScript))
         return false;
     if (batch.WriteCScript(Hash160(redeemScript), redeemScript)) {
-        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_storage.UnsetBlankWalletFlag(batch);
         return true;
     }
     return false;
