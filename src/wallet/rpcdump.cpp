@@ -68,15 +68,6 @@ static void RescanWallet(CWallet& wallet, const WalletRescanReserver& reserver, 
     }
 }
 
-static LegacyScriptPubKeyMan& GetLegacyScriptPubKeyMan(CWallet& wallet)
-{
-    LegacyScriptPubKeyMan* spk_man = wallet.GetLegacyScriptPubKeyMan();
-    if (!spk_man) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
-    }
-    return *spk_man;
-}
-
 UniValue importprivkey(const JSONRPCRequest& request)
 {
     RPCHelpMan{"importprivkey",
@@ -112,7 +103,7 @@ UniValue importprivkey(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_WALLET_ERROR, "Cannot import private keys to a wallet with private keys disabled");
     }
 
-    LegacyScriptPubKeyMan& spk_man = GetLegacyScriptPubKeyMan(*wallet);
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
 
     WalletBatch batch(pwallet->GetDBHandle());
     WalletRescanReserver reserver(pwallet);
@@ -223,6 +214,7 @@ UniValue importaddress(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
+    EnsureLegacyScriptPubKeyMan(*pwallet);
 
     std::string strLabel;
     if (!request.params[1].isNull())
@@ -412,6 +404,7 @@ UniValue importpubkey(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
+    EnsureLegacyScriptPubKeyMan(*wallet);
 
     std::string strLabel;
     if (!request.params[1].isNull())
@@ -488,6 +481,7 @@ UniValue importwallet(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
+    EnsureLegacyScriptPubKeyMan(*wallet);
 
     if (pwallet->chain().havePruned()) {
         // Exit early and print an error.
@@ -656,7 +650,7 @@ UniValue importelectrumwallet(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_WALLET_ERROR, "Error: Private keys are disabled for this wallet");
     }
 
-    LegacyScriptPubKeyMan& spk_man = GetLegacyScriptPubKeyMan(*wallet);
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
 
     LOCK(pwallet->cs_wallet);
     AssertLockHeld(spk_man.cs_wallet);
@@ -799,7 +793,7 @@ UniValue dumpprivkey(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
-    LegacyScriptPubKeyMan& spk_man = GetLegacyScriptPubKeyMan(*wallet);
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
 
     LOCK(pwallet->cs_wallet);
 
@@ -848,7 +842,7 @@ UniValue dumphdinfo(const JSONRPCRequest& request)
 
     EnsureWalletIsUnlocked(pwallet);
 
-    LegacyScriptPubKeyMan& spk_man = GetLegacyScriptPubKeyMan(*wallet);
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
     CHDChain hdChainCurrent;
     if (!spk_man.GetHDChain(hdChainCurrent))
         throw JSONRPCError(RPC_WALLET_ERROR, "This wallet is not a HD wallet.");
@@ -896,7 +890,7 @@ UniValue dumpwallet(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
-    LegacyScriptPubKeyMan& spk_man = GetLegacyScriptPubKeyMan(*wallet);
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*wallet);
 
     LOCK(pwallet->cs_wallet);
     AssertLockHeld(spk_man.cs_wallet);
@@ -1490,7 +1484,7 @@ UniValue importmulti(const JSONRPCRequest& mainRequest)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
-    GetLegacyScriptPubKeyMan(*wallet);
+    EnsureLegacyScriptPubKeyMan(*wallet);
 
     //Default options
     bool fRescan = true;

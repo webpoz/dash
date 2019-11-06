@@ -130,6 +130,15 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
     }
 }
 
+LegacyScriptPubKeyMan& EnsureLegacyScriptPubKeyMan(CWallet& wallet)
+{
+    LegacyScriptPubKeyMan* spk_man = wallet.GetLegacyScriptPubKeyMan();
+    if (!spk_man) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+    }
+    return *spk_man;
+}
+
 WalletContext& EnsureWalletContext(const util::Ref& context)
 {
     if (!context.Has<WalletContext>()) {
@@ -997,10 +1006,7 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
-    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
-    if (!spk_man) {
-        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
-    }
+    LegacyScriptPubKeyMan& spk_man = EnsureLegacyScriptPubKeyMan(*pwallet);
 
     LOCK(pwallet->cs_wallet);
 
@@ -1017,14 +1023,14 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
         if (IsHex(keys_or_addrs[i].get_str()) && (keys_or_addrs[i].get_str().length() == 66 || keys_or_addrs[i].get_str().length() == 130)) {
             pubkeys.push_back(HexToPubKey(keys_or_addrs[i].get_str()));
         } else {
-            pubkeys.push_back(AddrToPubKey(spk_man, keys_or_addrs[i].get_str()));
+            pubkeys.push_back(AddrToPubKey(&spk_man, keys_or_addrs[i].get_str()));
         }
     }
 
     // Construct using pay-to-script-hash:
     CScript inner = CreateMultisigRedeemscript(required, pubkeys);
     CScriptID innerID(inner);
-    spk_man->AddCScript(inner);
+    spk_man.AddCScript(inner);
 
     pwallet->SetAddressBook(innerID, label, "send");
 
@@ -3620,14 +3626,7 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
     ScriptPubKeyMan* spk_man = pwallet->GetScriptPubKeyMan();
     if (spk_man) {
         const CKeyID *key_id = boost::get<CKeyID>(&dest);
-        const CKeyMetadata* meta = nullptr;
-        if (key_id != nullptr && !key_id->IsNull()) {
-            meta = spk_man->GetMetadata(*key_id);
-        }
-        if (!meta) {
-            meta = spk_man->GetMetadata(CScriptID(scriptPubKey));
-        }
-        if (meta) {
+        if (const CKeyMetadata* meta = spk_man->GetMetadata(dest)) {
             ret.pushKV("timestamp", meta->nCreateTime);
             CHDChain hdChainCurrent;
             LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
