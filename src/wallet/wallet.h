@@ -155,7 +155,7 @@ class ReserveDestination : public CReserveScript
 {
 protected:
     //! The wallet to reserve from
-    CWallet* pwallet;
+    CWallet* const pwallet;
     LegacyScriptPubKeyMan* m_spk_man{nullptr};
 
     //! The index of the address's key in the keypool
@@ -169,10 +169,9 @@ protected:
 
 public:
     //! Construct a ReserveDestination object. This does NOT reserve an address yet
-    explicit ReserveDestination(CWallet* pwalletIn)
-    {
-        pwallet = pwalletIn;
-    }
+    explicit ReserveDestination(CWallet* pwallet)
+      : pwallet(pwallet)
+      { }
 
     ReserveDestination(const ReserveDestination&) = delete;
     ReserveDestination& operator=(const ReserveDestination&) = delete;
