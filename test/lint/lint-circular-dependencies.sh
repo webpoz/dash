@@ -22,7 +22,6 @@ EXPECTED_CIRCULAR_DEPENDENCIES=(
     "wallet/fees -> wallet/wallet -> wallet/fees"
     "wallet/wallet -> wallet/walletdb -> wallet/wallet"
     "wallet/coincontrol -> wallet/wallet -> wallet/coincontrol"
-    "txmempool -> validation -> validationinterface -> txmempool"
     "wallet/scriptpubkeyman -> wallet/wallet -> wallet/scriptpubkeyman"
     # Dash
     "coinjoin/server -> net_processing -> coinjoin/server"
@@ -72,7 +71,7 @@ EXPECTED_CIRCULAR_DEPENDENCIES=(
     "coinjoin/client -> net_processing -> coinjoin/client"
     "llmq/quorums -> net_processing -> llmq/quorums"
     "llmq/dkgsession -> llmq/dkgsessionmgr -> llmq/dkgsession"
-    "evo/deterministicmns -> validationinterface -> txmempool -> evo/deterministicmns"
+    "evo/deterministicmns -> evo/simplifiedmns -> llmq/blockprocessor -> net_processing -> txmempool -> evo/deterministicmns"
     "llmq/chainlocks -> validation -> llmq/chainlocks"
     "coinjoin/coinjoin -> llmq/chainlocks -> net -> coinjoin/coinjoin"
     "evo/deterministicmns -> llmq/utils -> net -> evo/deterministicmns"
