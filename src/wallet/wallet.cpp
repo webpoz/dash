@@ -3931,21 +3931,14 @@ bool ReserveDestination::GetReservedDestination(CTxDestination& dest, bool fInte
         return false;
     }
 
-    if (!pwallet->CanGetAddresses(fInternalIn)) {
-        return false;
-    }
-
     if (nIndex == -1)
     {
         CKeyPool keypool;
-        if (!m_spk_man->GetReservedDestination(fInternalIn, nIndex, keypool)) {
+        if (!m_spk_man->GetReservedDestination(fInternalIn, address, nIndex, keypool)) {
             return false;
         }
-        vchPubKey = keypool.vchPubKey;
         fInternal = keypool.fInternal;
     }
-    assert(vchPubKey.IsValid());
-    address = vchPubKey.GetID();
     dest = address;
     return true;
 }
@@ -3956,17 +3949,15 @@ void ReserveDestination::KeepDestination()
         m_spk_man->KeepDestination(nIndex);
     }
     nIndex = -1;
-    vchPubKey = CPubKey();
     address = CNoDestination();
 }
 
 void ReserveDestination::ReturnDestination()
 {
     if (nIndex != -1) {
-        m_spk_man->ReturnDestination(nIndex, fInternal, vchPubKey);
+        m_spk_man->ReturnDestination(nIndex, fInternal, address);
     }
     nIndex = -1;
-    vchPubKey = CPubKey();
     address = CNoDestination();
 }
 
