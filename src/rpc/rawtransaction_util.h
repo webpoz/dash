@@ -17,7 +17,7 @@ class COutPoint;
  * Sign a transaction with the given keystore and previous transactions
  *
  * @param  mtx           The transaction to-be-signed
- * @param  prevTxs       Array of previous txns outputs that tx depends on but may not yet be in the block chain
+ * @param  prevTxsUnival Array of previous txns outputs that tx depends on but may not yet be in the block chain
  * @param  keystore      Temporary keystore containing signing keys
  * @param  coins         Map of unspent outputs - coins in mempool and current chain UTXO set, may be extended by previous txns outputs after call
  * @param  tempKeystore  Whether to use temporary keystore
