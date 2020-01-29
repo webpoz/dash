@@ -37,6 +37,9 @@ TransactionError FillPSBT(const CWallet* pwallet, PartiallySignedTransaction& ps
         }
 
         complete &= SignPSBTInput(HidingSigningProvider(pwallet->GetSigningProvider(), !sign, !bip32derivs), psbtx, i, sighash_type);
+        if (input.non_witness_utxo && txin.prevout.n >= input.non_witness_utxo->vout.size()) {
+            return TransactionError::MISSING_INPUTS;
+        }
     }
 
     // Fill in the bip32 keypaths and redeemscripts for the outputs so that hardware wallets can identify change
