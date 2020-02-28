@@ -20,6 +20,7 @@
 #include <script/script_error.h>
 #include <streams.h>
 #include <util/strencodings.h>
+#include <test/util/transaction_utils.h>
 
 #include <map>
 #include <string>
@@ -295,7 +296,8 @@ BOOST_AUTO_TEST_CASE(test_Get)
     FillableSigningProvider keystore;
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
-    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+    std::vector<CMutableTransaction> dummyTransactions =
+        SetupDummyInputs(keystore, coins, {11*CENT, 50*CENT, 21*CENT, 22*CENT});
 
     CMutableTransaction t1;
     t1.vin.resize(3);
@@ -322,7 +324,8 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     FillableSigningProvider keystore;
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
-    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+    std::vector<CMutableTransaction> dummyTransactions =
+        SetupDummyInputs(keystore, coins, {11*CENT, 50*CENT, 21*CENT, 22*CENT});
 
     CMutableTransaction t;
     t.vin.resize(1);

@@ -6,6 +6,7 @@
 #include <coins.h>
 #include <policy/policy.h>
 #include <script/signingprovider.h>
+#include <test/util/transaction_utils.h>
 
 #include <vector>
 
@@ -61,7 +62,8 @@ static void CCoinsCaching(benchmark::Bench& bench)
     FillableSigningProvider keystore;
     CCoinsView coinsDummy;
     CCoinsViewCache coins(&coinsDummy);
-    std::vector<CMutableTransaction> dummyTransactions = SetupDummyInputs(keystore, coins);
+    std::vector<CMutableTransaction> dummyTransactions =
+        SetupDummyInputs(keystore, coins, {11 * COIN, 50 * COIN, 21 * COIN, 22 * COIN});
 
     CMutableTransaction t1;
     t1.vin.resize(3);
