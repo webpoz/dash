@@ -577,7 +577,7 @@ static UniValue getrawmempool(const JSONRPCRequest& request)
                 {
                     {RPCResult::Type::STR_HEX, "", "The transaction id"},
                 }},
-            RPCResult{"for verbose = true",
+                    RPCResult{"for verbose = true",
                 RPCResult::Type::OBJ, "", "",
                 {
                     {RPCResult::Type::OBJ_DYN, "transactionid", "", MempoolEntryDescription()},
@@ -1135,7 +1135,7 @@ static UniValue getblock(const JSONRPCRequest& request)
                                 }},
                             }},
                         }},
-                },
+        },
                 RPCExamples{
                     HelpExampleCli("getblock", "\"00000000000fd08c2fb661d2fcb0d49abb3a91e5f27082ce64feed3b4dede2e2\"")
             + HelpExampleRpc("getblock", "\"00000000000fd08c2fb661d2fcb0d49abb3a91e5f27082ce64feed3b4dede2e2\"")

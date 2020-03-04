@@ -27,7 +27,7 @@ UniValue getzmqnotifications(const JSONRPCRequest& request)
                     {RPCResult::Type::STR, "address", "Address of the publisher"},
                     {RPCResult::Type::NUM, "hwm", "Outbound message high water mark"},
                 }},
-            }
+                    }
         },
         RPCExamples{
             HelpExampleCli("getzmqnotifications", "")
