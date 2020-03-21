@@ -2623,8 +2623,9 @@ static UniValue getblockfilter(const JSONRPCRequest& request)
                 {RPCResult::Type::STR_HEX, "header", "the hex-encoded filter header"},
             }},
         RPCExamples{
-            HelpExampleCli("getblockfilter", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\" \"basic\"")
-        },
+            HelpExampleCli("getblockfilter", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\" \"basic\"")+
+        HelpExampleRpc("getblockfilter", "\"00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09\", \"basic\"")
+                },
     }.Check(request);
 
     uint256 block_hash = ParseHashV(request.params[0], "blockhash");
