@@ -8,11 +8,12 @@
 import configparser
 import copy
 from enum import Enum
-import logging
 import argparse
+import logging
 import os
 import pdb
 import random
+import re
 import shutil
 import subprocess
 import sys
@@ -230,10 +231,11 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
         self.extra_args_from_options = self.options.dashd_extra_args
 
+        self.options.previous_releases_path = os.getenv("PREVIOUS_RELEASES_DIR") or os.getcwd() + "/releases"
+
         os.environ['PATH'] = os.pathsep.join([
             os.path.join(config['environment']['BUILDDIR'], 'src'),
-            os.path.join(config['environment']['BUILDDIR'], 'src', 'qt'),
-            os.environ['PATH']
+            os.path.join(config['environment']['BUILDDIR'], 'src', 'qt'), os.environ['PATH']
         ])
 
         # Set up temp directory and start logging
@@ -436,6 +438,25 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
 
         Should only be called once after the nodes have been specified in
         set_test_params()."""
+        def get_bin_from_version(version, bin_name, bin_default):
+            if not version:
+                return bin_default
+            return os.path.join(
+                self.options.previous_releases_path,
+                re.sub(
+                    r'\.0$',
+                    '',  # remove trailing .0 for point releases
+                    'v{}.{}.{}.{}'.format(
+                        (version % 100000000) // 1000000,
+                        (version % 1000000) // 10000,
+                        (version % 10000) // 100,
+                        (version % 100) // 1,
+                    ),
+                ),
+                'bin',
+                bin_name,
+            )
+
         if self.bind_to_localhost_only:
             extra_confs = [["bind=127.0.0.1"]] * num_nodes
         else:
@@ -807,6 +828,25 @@ class BitcoinTestFramework(metaclass=BitcoinTestMetaClass):
         """Skip the running test if dash-cli has not been compiled."""
         if not self.is_cli_compiled():
             raise SkipTest("dash-cli has not been compiled.")
+
+    def skip_if_no_previous_releases(self):
+        """Skip the running test if previous releases are not available."""
+        if not self.has_previous_releases():
+            raise SkipTest("previous releases not available or disabled")
+
+    def has_previous_releases(self):
+        """Checks whether previous releases are present and enabled."""
+        if os.getenv("TEST_PREVIOUS_RELEASES") == "false":
+            # disabled
+            return False
+
+        if not os.path.isdir(self.options.previous_releases_path):
+            if os.getenv("TEST_PREVIOUS_RELEASES") == "true":
+                raise AssertionError("TEST_PREVIOUS_RELEASES=true but releases missing: {}".format(
+                    self.options.previous_releases_path))
+            # missing
+            return False
+        return True
 
     def is_cli_compiled(self):
         """Checks whether dash-cli was compiled."""
