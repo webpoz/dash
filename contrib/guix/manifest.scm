@@ -21,6 +21,7 @@
              (gnu packages linux)
              (gnu packages llvm)
              (gnu packages mingw)
+             (gnu packages moreutils)
              (gnu packages perl)
              (gnu packages pkg-config)
              (gnu packages python)
@@ -547,6 +548,7 @@ inspecting signatures in Mach-O binaries.")
         patch
         gawk
         sed
+        moreutils
         ;; Compression and archiving
         tar
         bzip2
