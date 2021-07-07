@@ -938,7 +938,7 @@ if TARGET_DARWIN
 	$(AM_V_at) OTOOL=$(OTOOL) $(PYTHON) $(top_srcdir)/contrib/devtools/symbol-check.py $(bin_PROGRAMS)
 endif
 
-if GLIBC_BACK_COMPAT
+if TARGET_LINUX
 	@echo "Checking glibc back compat..."
 	$(AM_V_at) CPPFILT=$(CPPFILT) $(PYTHON) $(top_srcdir)/contrib/devtools/symbol-check.py $(bin_PROGRAMS)
 endif
