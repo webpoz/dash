@@ -24,18 +24,17 @@ Before every major release:
 * Update [`src/chainparams.cpp`](/src/chainparams.cpp) m_assumed_blockchain_size and m_assumed_chain_state_size with the current size plus some overhead (see [this](#how-to-calculate-m_assumed_blockchain_size-and-m_assumed_chain_state_size) for information on how to calculate them).
 * Update `src/chainparams.cpp` chainTxData with statistics about the transaction count and rate. Use the output of the RPC `getchaintxstats`, see
   [this pull request](https://github.com/bitcoin/bitcoin/pull/12270) for an example. Reviewers can verify the results by running `getchaintxstats <window_block_count> <window_last_block_hash>` with the `window_block_count` and `window_last_block_hash` from your output.
-* Update version of `contrib/gitian-descriptors/*.yml`: usually one'd want to do this on master after branching off the release - but be sure to at least do it before a new major release
 
 ### First time / New builders
 
-If you're using the automated script (found in [contrib/gitian-build.py](/contrib/gitian-build.py)), then at this point you should run it with the "--setup" command. Otherwise ignore this.
+Install Guix using one of the installation methods detailed in
+[contrib/guix/INSTALL.md](/contrib/guix/INSTALL.md).
 
 Check out the source code in the following directory hierarchy.
 
 	cd /path/to/your/toplevel/build
-	git clone https://github.com/dashpay/gitian.sigs.git
+    git clone https://github.com/dashpay/guix.sigs.git
 	git clone https://github.com/dashpay/dash-detached-sigs.git
-	git clone https://github.com/devrandom/gitian-builder.git
 	git clone https://github.com/dashpay/dash.git
 
 ### Dash Core maintainers/release engineers, suggestion for writing release notes
@@ -52,79 +51,44 @@ Tag version (or release candidate) in git
 
     git tag -s v(new version, e.g. 0.12.3)
 
-### Setup and perform Gitian builds
+### Setup and perform Guix builds
 
-If you're using the automated script (found in [contrib/gitian-build.py](/contrib/gitian-build.py)), then at this point you should run it with the "--build" command. Otherwise ignore this.
+Checkout the Bitcoin Core version you'd like to build:
 
-Setup Gitian descriptors:
-
+```sh
     pushd ./dash
-    export SIGNER="(your Gitian key, ie UdjinM6, Pasta, etc)"
+    export SIGNER="(your builder key, ie UdjinM6, Pasta, etc)"
     export VERSION=(new version, e.g. 0.12.3)
     git fetch
     git checkout v${VERSION}
     popd
+```
 
-Ensure your gitian.sigs are up-to-date if you wish to gverify your builds against other Gitian signatures.
+Ensure your guix.sigs are up-to-date if you wish to `guix-verify` your builds
+against other `guix-attest` signatures.
 
-    pushd ./gitian.sigs
-    git pull
-    popd
+```sh
+git -C ./guix.sigs pull
+```
 
-Ensure gitian-builder is up-to-date:
+### Create the macOS SDK tarball: (first time, or when SDK version changes)
 
-    pushd ./gitian-builder
-    git pull
-    popd
+Create the macOS SDK tarball, see the [macdeploy
+instructions](/contrib/macdeploy/README.md#deterministic-macos-dmg-notes) for
+details.
 
+### Build and attest to build outputs:
 
-### Fetch and create inputs: (first time, or when dependency versions change)
+Follow the relevant Guix README.md sections:
+- [Performing a build](/contrib/guix/README.md#performing-a-build)
+- [Attesting to build outputs](/contrib/guix/README.md#attesting-to-build-outputs)
 
-    pushd ./gitian-builder
-    mkdir -p inputs
-    wget -O inputs/osslsigncode-2.0.tar.gz https://github.com/mtrojnar/osslsigncode/archive/2.0.tar.gz
-    echo '5a60e0a4b3e0b4d655317b2f12a810211c50242138322b16e7e01c6fbb89d92f inputs/osslsigncode-2.0.tar.gz' | sha256sum -c
-    popd
+### Verify other builders' signatures to your own. (Optional)
 
-Create the macOS SDK tarball, see the [macOS build instructions](build-osx.md#deterministic-macos-dmg-notes) for details, and copy it into the inputs directory.
+Add other builders keys to your gpg keyring, and/or refresh keys: See `../bitcoin/contrib/builder-keys/README.md`.
 
-### Optional: Seed the Gitian sources cache and offline git repositories
-
-NOTE: Gitian is sometimes unable to download files. If you have errors, try the step below.
-
-By default, Gitian will fetch source files as needed. To cache them ahead of time, make sure you have checked out the tag you want to build in dash, then:
-
-    pushd ./gitian-builder
-    make -C ../dash/depends download SOURCES_PATH=`pwd`/cache/common
-    popd
-
-Only missing files will be fetched, so this is safe to re-run for each build.
-
-NOTE: Offline builds must use the --url flag to ensure Gitian fetches only from local URLs. For example:
-
-    pushd ./gitian-builder
-    ./bin/gbuild --url dash=/path/to/dash,signature=/path/to/sigs {rest of arguments}
-    popd
-
-The gbuild invocations below <b>DO NOT DO THIS</b> by default.
-
-### Build and sign Dash Core for Linux, Windows, and macOS:
-
-    pushd ./gitian-builder
-    ./bin/gbuild --num-make 2 --memory 3000 --commit dash=v${VERSION} ../dash/contrib/gitian-descriptors/gitian-linux.yml
-    ./bin/gsign --signer "$SIGNER" --release ${VERSION}-linux --destination ../gitian.sigs/ ../dash/contrib/gitian-descriptors/gitian-linux.yml
-    mv build/out/dash-*.tar.gz build/out/src/dash-*.tar.gz ../
-
-    ./bin/gbuild --num-make 2 --memory 3000 --commit dash=v${VERSION} ../dash/contrib/gitian-descriptors/gitian-win.yml
-    ./bin/gsign --signer "$SIGNER" --release ${VERSION}-win-unsigned --destination ../gitian.sigs/ ../dash/contrib/gitian-descriptors/gitian-win.yml
-    mv build/out/dash-*-win-unsigned.tar.gz inputs/dash-win-unsigned.tar.gz
-    mv build/out/dash-*.zip build/out/dash-*.exe ../
-
-    ./bin/gbuild --num-make 2 --memory 3000 --commit dash=v${VERSION} ../dash/contrib/gitian-descriptors/gitian-osx.yml
-    ./bin/gsign --signer "$SIGNER" --release ${VERSION}-osx-unsigned --destination ../gitian.sigs/ ../dash/contrib/gitian-descriptors/gitian-osx.yml
-    mv build/out/dash-*-osx-unsigned.tar.gz inputs/dash-osx-unsigned.tar.gz
-    mv build/out/dash-*.tar.gz build/out/dash-*.dmg ../
-    popd
+Follow the relevant Guix README.md sections:
+- [Verifying build output attestations](/contrib/guix/README.md#verifying-build-output-attestations)
 
 Build output expected:
 
@@ -134,24 +98,9 @@ Build output expected:
   4. macOS unsigned installer and dist tarball (`dash-${VERSION}-osx-unsigned.dmg`, `dash-${VERSION}-osx64.tar.gz`)
   5. Gitian signatures (in `gitian.sigs/${VERSION}-<linux|{win,osx}-unsigned>/(your Gitian key)/`)
 
-### Verify other gitian builders signatures to your own. (Optional)
-
-Add other gitian builders keys to your gpg keyring, and/or refresh keys.
-
-    gpg --import dash/contrib/gitian-keys/*.pgp
-    gpg --refresh-keys
-
-Verify the signatures
-
-    pushd ./gitian-builder
-    ./bin/gverify -v -d ../gitian.sigs/ -r ${VERSION}-linux ../dash/contrib/gitian-descriptors/gitian-linux.yml
-    ./bin/gverify -v -d ../gitian.sigs/ -r ${VERSION}-win-unsigned ../dash/contrib/gitian-descriptors/gitian-win.yml
-    ./bin/gverify -v -d ../gitian.sigs/ -r ${VERSION}-osx-unsigned ../dash/contrib/gitian-descriptors/gitian-osx.yml
-    popd
-
 ### Next steps:
 
-Commit your signature to gitian.sigs:
+Commit your signature to guix.sigs:
 
     pushd gitian.sigs
     git add ${VERSION}-linux/"${SIGNER}"
@@ -171,7 +120,7 @@ Codesigner only: Sign the macOS binary:
     tar xf dashcore-osx-unsigned.tar.gz
     ./detached-sig-create.sh -s "Key ID" -o runtime
     Enter the keychain password and authorize the signature
-    Move signature-osx.tar.gz back to the gitian host
+    Move signature-osx.tar.gz back to the guix-build host
 
 Codesigner only: Sign the windows binaries:
 
@@ -197,7 +146,7 @@ Non-codesigners: wait for Windows/macOS detached signatures:
 - Once the Windows/macOS builds each have 3 matching signatures, they will be signed with their respective release keys.
 - Detached signatures will then be committed to the [dash-detached-sigs](https://github.com/dashpay/dash-detached-sigs) repository, which can be combined with the unsigned apps to create signed binaries.
 
-Create (and optionally verify) the signed macOS binary:
+Create (and optionally verify) the codesigned outputs:
 
     pushd ./gitian-builder
     ./bin/gbuild -i --commit signature=v${VERSION} ../dash/contrib/gitian-descriptors/gitian-osx-signer.yml
@@ -217,19 +166,34 @@ Create (and optionally verify) the signed Windows binaries:
 
 Commit your signature for the signed macOS/Windows binaries:
 
-    pushd gitian.sigs
-    git add ${VERSION}-osx-signed/"${SIGNER}"
-    git add ${VERSION}-win-signed/"${SIGNER}"
-    git commit -m "Add ${SIGNER} ${VERSION} signed binaries signatures"
-    git push  # Assuming you can push to the gitian.sigs tree
-    popd
+```sh
+pushd ./guix.sigs
+git add "${VERSION}/${SIGNER}"/all.SHA256SUMS{,.asc}
+git commit -m "Add ${SIGNER} ${VERSION} signed binaries signatures"
+git push  # Assuming you can push to the guix.sigs tree
+popd
+```
 
-### After 3 or more people have gitian-built and their results match:
+### After 3 or more people have guix-built and their results match:
 
-- Create `SHA256SUMS.asc` for the builds, and GPG-sign it:
+Combine `all.SHA256SUMS` and `all.SHA256SUMS.asc` into a clear-signed
+`SHA256SUMS.asc` message:
+
+```sh
+echo -e "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\n$(cat all.SHA256SUMS)\n$(cat filename.txt.asc)" > SHA256SUMS.asc
+```
+
+Here's an equivalent, more readable command if you're confident that you won't
+mess up whitespaces when copy-pasting:
 
 ```bash
-sha256sum * > SHA256SUMS
+cat << EOF > SHA256SUMS.asc
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA256
+
+$(cat all.SHA256SUMS)
+$(cat all.SHA256SUMS.asc)
+EOF
 ```
 
 The list of files should be:
@@ -249,13 +213,12 @@ in debugging can run Gitian to generate the files for themselves. To avoid
 end-user confusion about which file to pick, as well as save storage
 space *do not upload these to the dash.org server*.
 
-- GPG-sign it, delete the unsigned file:
-```
-gpg --digest-algo sha256 --clearsign SHA256SUMS # outputs SHA256SUMS.asc
-rm SHA256SUMS
-```
-(the digest algorithm is forced to sha256 to avoid confusion of the `Hash:` header that GPG adds with the SHA256 used for the files)
-Note: check that SHA256SUMS itself doesn't end up in SHA256SUMS, which is a spurious/nonsensical entry.
+       The `*-debug*` files generated by the guix build contain debug symbols
+       for troubleshooting by developers. It is assumed that anyone that is
+       interested in debugging can run guix to generate the files for
+       themselves. To avoid end-user confusion about which file to pick, as well
+       as save storage space *do not upload these to the bitcoincore.org server,
+       nor put them in the torrent*.
 
 - Upload zips and installers, as well as `SHA256SUMS.asc` from last step, to the dash.org server
 
