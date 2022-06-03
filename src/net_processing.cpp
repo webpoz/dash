@@ -4689,6 +4689,20 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
             }
             pto->vInventoryBlockToSend.clear();
 
+            auto queueAndMaybePushInv = [this, pto, &vInv, &msgMaker](const CInv& invIn) {
+                if (pto->m_tx_relay != nullptr) {
+                    AssertLockHeld(pto->m_tx_relay->cs_tx_inventory);
+                    pto->m_tx_relay->filterInventoryKnown.insert(invIn.hash);
+                }
+                LogPrint(BCLog::NET, "SendMessages -- queued inv: %s  index=%d peer=%d\n", invIn.ToString(), vInv.size(), pto->GetId());
+                vInv.push_back(invIn);
+                if (vInv.size() == MAX_INV_SZ) {
+                    LogPrint(BCLog::NET, "SendMessages -- pushing invs: count=%d peer=%d\n", vInv.size(), pto->GetId());
+                    connman->PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
+                    vInv.clear();
+                }
+            };
+
             if (pto->m_tx_relay != nullptr) {
                 LOCK(pto->m_tx_relay->cs_tx_inventory);
                 // Check whether periodic sends should happen
@@ -4711,18 +4725,6 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     LOCK(pto->m_tx_relay->cs_filter);
                     if (!pto->m_tx_relay->fRelayTxes) pto->m_tx_relay->setInventoryTxToSend.clear();
                 }
-
-                auto queueAndMaybePushInv = [this, pto, &vInv, &msgMaker](const CInv& invIn) {
-                    AssertLockHeld(pto->m_tx_relay->cs_tx_inventory);
-                    pto->m_tx_relay->filterInventoryKnown.insert(invIn.hash);
-                    LogPrint(BCLog::NET, "SendMessages -- queued inv: %s  index=%d peer=%d\n", invIn.ToString(), vInv.size(), pto->GetId());
-                    vInv.push_back(invIn);
-                    if (vInv.size() == MAX_INV_SZ) {
-                        LogPrint(BCLog::NET, "SendMessages -- pushing invs: count=%d peer=%d\n", vInv.size(), pto->GetId());
-                        connman->PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
-                        vInv.clear();
-                    }
-                };
 
                 // Respond to BIP35 mempool requests
                 if (fSendTrickle && pto->m_tx_relay->fSendMempool) {
@@ -4818,19 +4820,10 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     queueAndMaybePushInv(inv);
                 }
                 pto->vInventoryOtherToSend.clear();
-            } else if (true || false) {
-                auto queueAndMaybePushInv_non_tx = [this, pto, &vInv, &msgMaker](const CInv& invIn) {
-                    LogPrint(BCLog::NET, "SendMessages -- queued inv: %s  index=%d peer=%d\n", invIn.ToString(), vInv.size(), pto->GetId());
-                    vInv.push_back(invIn);
-                    if (vInv.size() == MAX_INV_SZ) {
-                        LogPrint(BCLog::NET, "SendMessages -- pushing invs: count=%d peer=%d\n", vInv.size(), pto->GetId());
-                        connman->PushMessage(pto, msgMaker.Make(NetMsgType::INV, vInv));
-                        vInv.clear();
-                    }
-                };
+            } else { // m_tx_relay is nullptr but we still need to send items from `vInventoryOtherToSend`
                 // Send non-tx/non-block inventory items
                 for (const auto& inv : pto->vInventoryOtherToSend) {
-                    queueAndMaybePushInv_non_tx(inv);
+                    queueAndMaybePushInv(inv);
                 }
                 pto->vInventoryOtherToSend.clear();
             }
