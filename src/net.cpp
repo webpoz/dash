@@ -2415,7 +2415,7 @@ void CConnman::ThreadOpenMasternodeConnections()
         // NOTE: Process only one pending masternode at a time
 
         CDeterministicMNCPtr connectToDmn;
-        bool isProbe = false;
+        MasternodeProbeConn isProbe = MasternodeProbeConn::IsNotConnection;
         { // don't hold lock while calling OpenMasternodeConnection as cs_main is locked deep inside
             LOCK2(cs_vNodes, cs_vPendingMasternodes);
 
@@ -2483,7 +2483,7 @@ void CConnman::ThreadOpenMasternodeConnections()
                 if (!pending.empty()) {
                     connectToDmn = pending[GetRandInt(pending.size())];
                     masternodePendingProbes.erase(connectToDmn->proTxHash);
-                    isProbe = true;
+                    isProbe = MasternodeProbeConn::IsConnection;
 
                     LogPrint(BCLog::NET_NETCONN, "CConnman::%s -- probing masternode %s, service=%s\n", __func__, connectToDmn->proTxHash.ToString(), connectToDmn->pdmnState->addr.ToString(false));
                 }
@@ -2515,8 +2515,7 @@ void CConnman::ThreadOpenMasternodeConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-// KNST refactor masternode_connection, masternode_probe_connection to enums
-void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler, bool manual_connection, bool block_relay_only, bool masternode_connection, bool masternode_probe_connection)
+void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot, bool fFeeler, bool manual_connection, bool block_relay_only, MasternodeConn masternode_connection, MasternodeProbeConn masternode_probe_connection)
 {
     //
     // Initiate outbound network connection
@@ -2571,9 +2570,9 @@ void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
         pnode->fFeeler = true;
     if (manual_connection)
         pnode->m_manual_connection = true;
-    if (masternode_connection)
+    if (masternode_connection == MasternodeConn::IsConnection)
         pnode->m_masternode_connection = true;
-    if (masternode_probe_connection)
+    if (masternode_probe_connection == MasternodeProbeConn::IsConnection)
         pnode->m_masternode_probe_connection = true;
 
     {
@@ -2590,8 +2589,8 @@ void CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
     }
 }
 
-void CConnman::OpenMasternodeConnection(const CAddress &addrConnect, bool probe) {
-    OpenNetworkConnection(addrConnect, false, nullptr, nullptr, false, /* feeler = */ false, false, /*block_relay_only = */ false, true, probe);
+void CConnman::OpenMasternodeConnection(const CAddress &addrConnect, MasternodeProbeConn probe) {
+    OpenNetworkConnection(addrConnect, false, nullptr, nullptr, false, false, false, false, MasternodeConn::IsConnection, probe);
 }
 
 void CConnman::ThreadMessageHandler()

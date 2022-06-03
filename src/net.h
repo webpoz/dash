@@ -230,8 +230,19 @@ public:
     bool GetUseAddrmanOutgoing() const { return m_use_addrman_outgoing; };
     void SetNetworkActive(bool active);
     SocketEventsMode GetSocketEventsMode() const { return socketEventsMode; }
-    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, bool fOneShot = false, bool fFeeler = false, bool manual_connection = false, bool block_relay_only = false, bool masternode_connection = false, bool masternode_probe_connection = false);
-    void OpenMasternodeConnection(const CAddress& addrConnect, bool probe = false);
+
+    enum class MasternodeConn {
+        IsNotConnection,
+        IsConnection,
+    };
+
+    enum class MasternodeProbeConn {
+        IsNotConnection,
+        IsConnection,
+    };
+
+    void OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = nullptr, const char *strDest = nullptr, bool fOneShot = false, bool fFeeler = false, bool manual_connection = false, bool block_relay_only = false, MasternodeConn masternode_connection = MasternodeConn::IsNotConnection, MasternodeProbeConn masternode_probe_connection = MasternodeProbeConn::IsNotConnection);
+    void OpenMasternodeConnection(const CAddress& addrConnect, MasternodeProbeConn probe = MasternodeProbeConn::IsConnection);
     bool CheckIncomingNonce(uint64_t nonce);
 
     struct CFullyConnectedOnly {
