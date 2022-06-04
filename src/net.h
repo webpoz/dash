@@ -1240,6 +1240,7 @@ public:
                 LOCK(m_tx_relay->cs_tx_inventory);
                 if (!m_tx_relay->filterInventoryKnown.contains(inv.hash)) {
                     LogPrint(BCLog::NET, "%s -- adding new inv: %s peer=%d\n", __func__, inv.ToString(), id);
+                    LOCK(m_tx_relay->cs_filter);
                     m_tx_relay->setInventoryTxToSend.insert(inv.hash);
                 } else {
                     LogPrint(BCLog::NET, "%s -- skipping known inv: %s peer=%d\n", __func__, inv.ToString(), id);

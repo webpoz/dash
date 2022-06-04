@@ -4671,7 +4671,6 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
 
             size_t reserve = INVENTORY_BROADCAST_MAX_PER_1MB_BLOCK * MaxBlockSize() / 1000000;
             if (pto->m_tx_relay != nullptr) {
-                // missed previous time too ?
                 LOCK(pto->m_tx_relay->cs_filter);
                 reserve = std::min<size_t>(pto->m_tx_relay->setInventoryTxToSend.size(), reserve);
             }
@@ -4760,6 +4759,8 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
 
                 // Determine transactions to relay
                 if (fSendTrickle) {
+                    LOCK(pto->m_tx_relay->cs_filter);
+
                     // Produce a vector with all candidates for sending
                     std::vector<std::set<uint256>::iterator> vInvTx;
                     vInvTx.reserve(pto->m_tx_relay->setInventoryTxToSend.size());
@@ -4773,7 +4774,6 @@ bool PeerLogicValidation::SendMessages(CNode* pto)
                     // No reason to drain out at many times the network's capacity,
                     // especially since we have many peers and some will draw much shorter delays.
                     unsigned int nRelayedTransactions = 0;
-                    LOCK(pto->m_tx_relay->cs_filter);
                     while (!vInvTx.empty() && nRelayedTransactions < INVENTORY_BROADCAST_MAX_PER_1MB_BLOCK * MaxBlockSize() / 1000000) {
                         // Fetch the top element from the heap
                         std::pop_heap(vInvTx.begin(), vInvTx.end(), compareInvMempoolOrder);
