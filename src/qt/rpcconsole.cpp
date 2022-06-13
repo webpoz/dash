@@ -1,5 +1,5 @@
 // Copyright (c) 2011-2015 The Bitcoin Core developers
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -824,10 +824,10 @@ void RPCConsole::buildParameterlist(QString arg)
 
     for (const auto& [key, values] : gArgs.GetCommandLineArgs()) {
         for (const auto& value : values) {
-            if (value.empty()) {
-                args << QString::fromStdString(key);
+            if (value.getValStr().empty()) {
+                args << QString::fromStdString("-" + key);
             } else {
-                args << QString::fromStdString(key + "=" + value);
+                args << QString::fromStdString("-" + key + "=" + value.getValStr());
             }
         }
     }

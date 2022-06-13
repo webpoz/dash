@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -152,6 +152,8 @@ class CCoinJoinClientQueueManager : public CCoinJoinBaseManager
 {
 public:
     void ProcessMessage(CNode* pfrom, const std::string& msg_type, CDataStream& vRecv, CConnman& connman, bool enable_bip61) LOCKS_EXCLUDED(cs_vecqueue);
+
+    void ProcessDSQueue(CNode* pfrom, const std::string& msg_type, CDataStream& vRecv, CConnman& connman, bool enable_bip61);
 
     void DoMaintenance();
 };

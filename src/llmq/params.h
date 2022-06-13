@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Dash Core developers
+// Copyright (c) 2021-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -90,8 +90,9 @@ struct LLMQParams {
     // Number of quorums to consider "active" for signing sessions
     int signingActiveQuorumCount;
 
-    // Used for intra-quorum communication. This is the number of quorums for which we should keep old connections. This
-    // should be at least one more then the active quorums set.
+    // Used for intra-quorum communication. This is the number of quorums for which we should keep old connections.
+    // For non-rotated quorums it should be at least one more than the active quorums set.
+    // For rotated quorums it should be equal to 2 x active quorums set.
     int keepOldConnections;
 
     // How many members should we try to send all sigShares to before we give up.
@@ -193,7 +194,7 @@ static constexpr std::array<LLMQParams, 10> available_llmqs = {
 
         .signingActiveQuorumCount = 2, // just a few ones to allow easier testing
 
-        .keepOldConnections = 3,
+        .keepOldConnections = 4,
         .recoveryMembers = 3,
     },
 
@@ -265,7 +266,7 @@ static constexpr std::array<LLMQParams, 10> available_llmqs = {
         .dkgBadVotesThreshold = 48,
 
         .signingActiveQuorumCount = 32,
-        .keepOldConnections = 33,
+        .keepOldConnections = 64,
         .recoveryMembers = 25,
     },
 

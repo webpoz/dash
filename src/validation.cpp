@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2018 The Bitcoin Core developers
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -1187,21 +1187,10 @@ bool CChainState::IsInitialBlockDownload() const
 
 static CBlockIndex *pindexBestForkTip = nullptr, *pindexBestForkBase = nullptr;
 
-BlockMap& BlockIndex()
-{
-    LOCK(::cs_main);
-    return g_chainman.m_blockman.m_block_index;
-}
-
-PrevBlockMap& PrevBlockIndex()
-{
-    LOCK(::cs_main);
-    return g_chainman.m_blockman.m_prev_block_index;
-}
-
 static void AlertNotify(const std::string& strMessage)
 {
     uiInterface.NotifyAlertChanged();
+#if HAVE_SYSTEM
     std::string strCmd = gArgs.GetArg("-alertnotify", "");
     if (strCmd.empty()) return;
 
@@ -1215,6 +1204,7 @@ static void AlertNotify(const std::string& strMessage)
 
     std::thread t(runCommand, strCmd);
     t.detach(); // thread runs free
+#endif
 }
 
 static void CheckForkWarningConditions() EXCLUSIVE_LOCKS_REQUIRED(cs_main)
@@ -3365,7 +3355,7 @@ void CChainState::EnforceBlock(CValidationState& state, const CChainParams& chai
 
     while (pindex_walk && !::ChainActive().Contains(pindex_walk)) {
         // Mark all blocks that have the same prevBlockHash but are not equal to blockHash as conflicting
-        auto itp = ::PrevBlockIndex().equal_range(pindex_walk->pprev->GetBlockHash());
+        auto itp = g_chainman.PrevBlockIndex().equal_range(pindex_walk->pprev->GetBlockHash());
         for (auto jt = itp.first; jt != itp.second; ++jt) {
             if (jt->second == pindex_walk) {
                 continue;

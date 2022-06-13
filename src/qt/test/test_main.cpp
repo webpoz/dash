@@ -1,5 +1,5 @@
 // Copyright (c) 2009-2016 The Bitcoin Core developers
-// Copyright (c) 2014-2020 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -54,7 +54,9 @@ int main(int argc, char *argv[])
         BasicTestingSetup dummy{CBaseChainParams::REGTEST};
     }
 
-    std::unique_ptr<interfaces::Node> node = interfaces::MakeNode();
+    NodeContext node_context;
+    node_context.args = &::gArgs; // TODO: remove this patchfix to solve unexplained test failure
+    std::unique_ptr<interfaces::Node> node = interfaces::MakeNode(&node_context);
 
     bool fInvalid = false;
 

@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Dash Core developers
+// Copyright (c) 2021-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -28,7 +28,7 @@ void CQuorumSnapshot::ToJson(UniValue& obj) const
     //TODO Check this function if correct
     obj.setObject();
     UniValue activeQ(UniValue::VARR);
-    for (const auto& h : activeQuorumMembers) {
+    for (const bool h : activeQuorumMembers) {
         // cppcheck-suppress useStlAlgorithm
         activeQ.push_back(h);
     }

@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2019 The Bitcoin Core developers
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -72,8 +72,10 @@ bool AddWallet(const std::shared_ptr<CWallet>& wallet)
 
 bool RemoveWallet(const std::shared_ptr<CWallet>& wallet)
 {
-    LOCK(cs_wallets);
     assert(wallet);
+    // Unregister with the validation interface which also drops shared ponters.
+    wallet->m_chain_notifications_handler.reset();
+    LOCK(cs_wallets);
     std::vector<std::shared_ptr<CWallet>>::iterator i = std::find(vpwallets.begin(), vpwallets.end(), wallet);
     if (i == vpwallets.end()) return false;
     vpwallets.erase(i);
@@ -113,13 +115,9 @@ static std::set<std::string> g_unloading_wallet_set GUARDED_BY(g_wallet_release_
 // Custom deleter for shared_ptr<CWallet>.
 static void ReleaseWallet(CWallet* wallet)
 {
-    // Unregister and delete the wallet right after BlockUntilSyncedToCurrentChain
-    // so that it's in sync with the current chainstate.
     const std::string name = wallet->GetName();
     wallet->WalletLogPrintf("Releasing wallet\n");
-    wallet->BlockUntilSyncedToCurrentChain();
     wallet->Flush();
-    wallet->m_chain_notifications_handler.reset();
     delete wallet;
     // Wallet is now released, notify UnloadWallet, if any.
     {
@@ -145,6 +143,7 @@ void UnloadWallet(std::shared_ptr<CWallet>&& wallet)
     // Notify the unload intent so that all remaining shared pointers are
     // released.
     wallet->NotifyUnload();
+
     // Time to ditch our shared_ptr and wait for ReleaseWallet call.
     wallet.reset();
     {
@@ -1256,6 +1255,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
     // Notify UI of new or updated transaction
     NotifyTransactionChanged(this, hash, fInsertedNew ? CT_NEW : CT_UPDATED);
 
+#if HAVE_SYSTEM
     // notify an external script when a wallet transaction comes in or is updated
     std::string strCmd = gArgs.GetArg("-walletnotify", "");
 
@@ -1265,6 +1265,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFlushOnClose)
         std::thread t(runCommand, strCmd);
         t.detach(); // thread runs free
     }
+#endif
 
     fAnonymizableTallyCached = false;
     fAnonymizableTallyCachedNonDenom = false;
@@ -1392,6 +1393,13 @@ bool CWallet::TransactionCanBeAbandoned(const uint256& hashTx) const
     return wtx && !wtx->isAbandoned() && wtx->GetDepthInMainChain() == 0 && !wtx->InMempool();
 }
 
+bool CWallet::TransactionCanBeResent(const uint256& hashTx) const
+{
+    LOCK(cs_wallet);
+    const CWalletTx* wtx = GetWalletTx(hashTx);
+    return wtx && wtx->CanBeResent();
+}
+
 void CWallet::MarkInputsDirty(const CTransactionRef& tx)
 {
     for (const CTxIn& txin : tx->vin) {
@@ -1457,6 +1465,18 @@ bool CWallet::AbandonTransaction(const uint256& hashTx)
     fAnonymizableTallyCachedNonDenom = false;
 
     return true;
+}
+
+bool CWallet::ResendTransaction(const uint256& hashTx)
+{
+    LOCK(cs_wallet);
+
+    auto it = mapWallet.find(hashTx);
+    assert(it != mapWallet.end());
+    CWalletTx& wtx = it->second;
+
+    std::string unused_err_string;
+    return wtx.SubmitMemoryPoolAndRelay(unused_err_string, true);
 }
 
 void CWallet::MarkConflicted(const uint256& hashBlock, int conflicting_height, const uint256& hashTx)
@@ -2506,19 +2526,25 @@ void CWallet::ReacceptWalletTransactions()
     }
 }
 
+bool CWalletTx::CanBeResent() const
+{
+    return
+        // Can't relay if wallet is not broadcasting
+        pwallet->GetBroadcastTransactions() &&
+        // Don't relay abandoned transactions
+        !isAbandoned() &&
+        // Don't try to submit coinbase transactions. These would fail anyway but would
+        // cause log spam.
+        !IsCoinBase() &&
+        // Don't try to submit conflicted or confirmed transactions.
+        GetDepthInMainChain() == 0 &&
+        // Don't try to submit transactions locked via InstantSend.
+        !IsLockedByInstantSend();
+}
+
 bool CWalletTx::SubmitMemoryPoolAndRelay(std::string& err_string, bool relay)
 {
-    // Can't relay if wallet is not broadcasting
-    if (!pwallet->GetBroadcastTransactions()) return false;
-    // Don't relay abandoned transactions
-    if (isAbandoned()) return false;
-    // Don't try to submit coinbase transactions. These would fail anyway but would
-    // cause log spam.
-    if (IsCoinBase()) return false;
-    // Don't try to submit conflicted or confirmed transactions.
-    if (GetDepthInMainChain() != 0) return false;
-    // Don't try to submit transactions locked via InstantSend.
-    if (IsLockedByInstantSend()) return false;
+    if (!CanBeResent()) return false;
 
     // Submit transaction to mempool for relay
     pwallet->WalletLogPrintf("Submitting wtx %s to mempool for relay\n", GetHash().ToString());
@@ -5081,9 +5107,9 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
                 walletInstance->SetMinVersion(FEATURE_HD);
 
                 // clean up
-                gArgs.ForceRemoveArg("-hdseed");
-                gArgs.ForceRemoveArg("-mnemonic");
-                gArgs.ForceRemoveArg("-mnemonicpassphrase");
+                gArgs.ForceRemoveArg("hdseed");
+                gArgs.ForceRemoveArg("mnemonic");
+                gArgs.ForceRemoveArg("mnemonicpassphrase");
             }
         } // Otherwise, do not create a new HD chain
 
@@ -5224,7 +5250,7 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
     // but we guarantee at least than wallet state is correct after notifications delivery.
     // This is temporary until rescan and notifications delivery are unified under same
     // interface.
-    walletInstance->m_chain_notifications_handler = walletInstance->chain().handleNotifications(*walletInstance);
+    walletInstance->m_chain_notifications_handler = walletInstance->chain().handleNotifications(walletInstance);
 
     int rescan_height = 0;
     if (!gArgs.GetBoolArg("-rescan", false))
@@ -5308,11 +5334,6 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
     }
 
     return walletInstance;
-}
-
-void CWallet::handleNotifications()
-{
-    m_chain_notifications_handler = m_chain->handleNotifications(*this);
 }
 
 void CWallet::postInitProcess()
@@ -5488,6 +5509,7 @@ void CWallet::NotifyTransactionLock(const CTransactionRef &tx, const std::shared
     if (mi != mapWallet.end()){
         NotifyTransactionChanged(this, txHash, CT_UPDATED);
         NotifyISLockReceived();
+#if HAVE_SYSTEM
         // notify an external script
         std::string strCmd = gArgs.GetArg("-instantsendnotify", "");
         if (!strCmd.empty()) {
@@ -5495,6 +5517,7 @@ void CWallet::NotifyTransactionLock(const CTransactionRef &tx, const std::shared
             std::thread t(runCommand, strCmd);
             t.detach(); // thread runs free
         }
+#endif
     }
 }
 

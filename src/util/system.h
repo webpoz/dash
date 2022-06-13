@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2019 The Bitcoin Core developers
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -23,6 +23,7 @@
 #include <sync.h>
 #include <tinyformat.h>
 #include <util/memory.h>
+#include <util/settings.h>
 #include <util/threadnames.h>
 #include <util/time.h>
 #include <amount.h>
@@ -92,13 +93,17 @@ fs::path GetDefaultDataDir();
 const fs::path &GetBlocksDir();
 const fs::path &GetDataDir(bool fNetSpecific = true);
 fs::path GetBackupsDir();
+// Return true if -datadir option points to a valid directory or is not specified.
+bool CheckDataDirOption();
 /** Tests only */
 void ClearDatadirCache();
 fs::path GetConfigFile(const std::string& confPath);
 #ifdef WIN32
 fs::path GetSpecialFolderPath(int nFolder, bool fCreate = true);
 #endif
+#if HAVE_SYSTEM
 void runCommand(const std::string& strCommand);
+#endif
 
 /**
  * Most paths passed as configuration arguments are treated as relative to
@@ -180,9 +185,7 @@ protected:
     };
 
     mutable CCriticalSection cs_args;
-    std::map<std::string, std::vector<std::string>> m_override_args GUARDED_BY(cs_args);
-    std::map<std::string, std::vector<std::string>> m_command_line_args GUARDED_BY(cs_args);
-    std::map<std::string, std::vector<std::string>> m_config_args GUARDED_BY(cs_args);
+    util::Settings m_settings GUARDED_BY(cs_args);
     std::string m_network GUARDED_BY(cs_args);
     std::set<std::string> m_network_only_args GUARDED_BY(cs_args);
     std::map<OptionsCategory, std::map<std::string, Arg>> m_available_args GUARDED_BY(cs_args);
@@ -192,6 +195,7 @@ protected:
 
 public:
     ArgsManager();
+    ~ArgsManager();
 
     /**
      * Select the network in use
@@ -215,9 +219,9 @@ public:
     const std::list<SectionInfo> GetUnrecognizedSections() const;
 
     /**
-     * Return the map of all the args passed via cmd line
+     * Return the map of all the args passed via the command line
      */
-    const std::map<std::string, std::vector<std::string>> GetCommandLineArgs() const;
+    const std::map<std::string, std::vector<util::SettingsValue>> GetCommandLineArgs() const;
 
     /**
      * Return a vector of strings of the given argument
@@ -344,6 +348,9 @@ extern ArgsManager gArgs;
  * @return true if help has been requested via a command-line arg
  */
 bool HelpRequested(const ArgsManager& args);
+
+/** Add help options to the args manager */
+void SetupHelpOptions(ArgsManager& args);
 
 /**
  * Format a string to be used as group of options in help messages

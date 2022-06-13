@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Dash Core developers
+// Copyright (c) 2021-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -36,7 +36,7 @@ struct TestChainBRRBeforeActivationSetup : public TestChainSetup
         // Force fast DIP3 activation
         gArgs.ForceSetArg("-dip3params", "30:50");
         SelectParams(CBaseChainParams::REGTEST);
-        gArgs.ForceRemoveArg("-dip3params");
+        gArgs.ForceRemoveArg("dip3params");
     }
 };
 
@@ -164,7 +164,7 @@ BOOST_FIXTURE_TEST_CASE(block_reward_reallocation, TestChainBRRBeforeActivationS
             LOCK(cs_main);
             deterministicMNManager->UpdatedBlockTip(::ChainActive().Tip());
         }
-        gArgs.ForceRemoveArg("-blockversion");
+        gArgs.ForceRemoveArg("blockversion");
         if (num_blocks > 0) {
             // Mine signalling blocks
             for (int i = 0; i < num_blocks; ++i) {

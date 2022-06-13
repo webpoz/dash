@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,8 +15,11 @@
 #include <util/ranges.h>
 
 
-void CMasternodeUtils::ProcessMasternodeConnections(CConnman& connman)
+void CMasternodeUtils::DoMaintenance(CConnman& connman)
 {
+    if(!masternodeSync.IsBlockchainSynced() || ShutdownRequested())
+        return;
+
     std::vector<CDeterministicMNCPtr> vecDmns; // will be empty when no wallet
 #ifdef ENABLE_WALLET
     for (const auto& pair : coinJoinClientManagers) {
@@ -77,18 +80,3 @@ void CMasternodeUtils::ProcessMasternodeConnections(CConnman& connman)
         pnode->fDisconnect = true;
     });
 }
-
-void CMasternodeUtils::DoMaintenance(CConnman& connman)
-{
-    if(!masternodeSync.IsBlockchainSynced() || ShutdownRequested())
-        return;
-
-    static unsigned int nTick = 0;
-
-    nTick++;
-
-    if(nTick % 60 == 0) {
-        ProcessMasternodeConnections(connman);
-    }
-}
-

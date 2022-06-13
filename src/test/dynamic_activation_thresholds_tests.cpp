@@ -1,4 +1,4 @@
-// Copyright (c) 2021 The Dash Core developers
+// Copyright (c) 2021-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -37,7 +37,7 @@ struct TestChainDATSetup : public TestChainSetup
         for (int i = 0; i < window - num_blocks; ++i) {
             CreateAndProcessBlock({}, coinbaseKey);
         }
-        gArgs.ForceRemoveArg("-blockversion");
+        gArgs.ForceRemoveArg("blockversion");
         if (num_blocks > 0) {
             // Mine signalling blocks
             for (int i = 0; i < num_blocks; ++i) {

@@ -1,4 +1,4 @@
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT/X11 software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -110,8 +110,7 @@ static UniValue gobject_check(const JSONRPCRequest& request)
     if (govobj.GetObjectType() == GOVERNANCE_OBJECT_PROPOSAL) {
         LOCK(cs_main);
         bool fAllowScript = (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE);
-        // Note: we do not allow legacy format in RPC already, no need to reuse DEPLOYMENT_DIP0024
-        CProposalValidator validator(strDataHex, false, fAllowScript);
+        CProposalValidator validator(strDataHex, fAllowScript);
         if (!validator.Validate())  {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid proposal data, error messages:" + validator.GetErrorMessages());
         }
@@ -187,8 +186,7 @@ static UniValue gobject_prepare(const JSONRPCRequest& request)
     if (govobj.GetObjectType() == GOVERNANCE_OBJECT_PROPOSAL) {
         LOCK(cs_main);
         bool fAllowScript = (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE);
-        // Note: we do not allow legacy format in RPC already, no need to reuse DEPLOYMENT_DIP0024
-        CProposalValidator validator(strDataHex, false, fAllowScript);
+        CProposalValidator validator(strDataHex, fAllowScript);
         if (!validator.Validate()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid proposal data, error messages:" + validator.GetErrorMessages());
         }
@@ -358,8 +356,7 @@ static UniValue gobject_submit(const JSONRPCRequest& request)
     if (govobj.GetObjectType() == GOVERNANCE_OBJECT_PROPOSAL) {
         LOCK(cs_main);
         bool fAllowScript = (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE);
-        // Note: we do not allow legacy format in RPC already, no need to reuse DEPLOYMENT_DIP0024
-        CProposalValidator validator(strDataHex, false, fAllowScript);
+        CProposalValidator validator(strDataHex, fAllowScript);
         if (!validator.Validate()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid proposal data, error messages:" + validator.GetErrorMessages());
         }
@@ -927,7 +924,7 @@ static void gobject_getcurrentvotes_help(const JSONRPCRequest& request)
         {
             {"governance-hash", RPCArg::Type::STR_HEX, RPCArg::Optional::NO, "object id"},
             {"txid", RPCArg::Type::STR_HEX, /* default */ "", "masternode collateral txid"},
-            {"vout", RPCArg::Type::STR, /* default */ "", "masternode collateral output index, required if <txid> presents"},
+            {"vout", RPCArg::Type::STR, /* default */ "", "masternode collateral output index, required if <txid> present"},
         },
         RPCResults{},
         RPCExamples{""}
@@ -1148,6 +1145,7 @@ static UniValue getgovernanceinfo(const JSONRPCRequest& request)
                 {RPCResult::Type::NUM, "governanceminquorum", "the absolute minimum number of votes needed to trigger a governance action"},
                 {RPCResult::Type::NUM, "proposalfee", "the collateral transaction fee which must be paid to create a proposal in " + CURRENCY_UNIT + ""},
                 {RPCResult::Type::NUM, "superblockcycle", "the number of blocks between superblocks"},
+                {RPCResult::Type::NUM, "superblockmaturitywindow", "the superblock trigger creation window"},
                 {RPCResult::Type::NUM, "lastsuperblock", "the block number of the last superblock"},
                 {RPCResult::Type::NUM, "nextsuperblock", "the block number of the next superblock"},
             }},
@@ -1169,6 +1167,7 @@ static UniValue getgovernanceinfo(const JSONRPCRequest& request)
     bool fork_active = VersionBitsState(pindex, Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024, versionbitscache) == ThresholdState::ACTIVE;
     obj.pushKV("proposalfee", ValueFromAmount(fork_active ? GOVERNANCE_PROPOSAL_FEE_TX : GOVERNANCE_PROPOSAL_FEE_TX_OLD));
     obj.pushKV("superblockcycle", Params().GetConsensus().nSuperblockCycle);
+    obj.pushKV("superblockmaturitywindow", Params().GetConsensus().nSuperblockMaturityWindow);
     obj.pushKV("lastsuperblock", nLastSuperblock);
     obj.pushKV("nextsuperblock", nNextSuperblock);
 

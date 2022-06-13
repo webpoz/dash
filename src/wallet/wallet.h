@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2015 The Bitcoin Core developers
-// Copyright (c) 2014-2021 The Dash Core developers
+// Copyright (c) 2014-2022 The Dash Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -608,6 +608,8 @@ public:
 
     int64_t GetTxTime() const;
 
+    bool CanBeResent() const;
+
     // Pass this transaction to node for mempool insertion and relay to peers if flag set to true
     bool SubmitMemoryPoolAndRelay(std::string& err_string, bool relay);
 
@@ -741,7 +743,7 @@ class WalletRescanReserver; //forward declarations for ScanForWalletTransactions
  * A CWallet is an extension of a keystore, which also maintains a set of transactions and balances,
  * and provides the ability to create new transactions.
  */
-class CWallet final : public CCryptoKeyStore, private interfaces::Chain::Notifications
+class CWallet final : public CCryptoKeyStore, public interfaces::Chain::Notifications
 {
 private:
     std::atomic<bool> fAbortRescan{false};
@@ -953,9 +955,6 @@ public:
 
     /** Registered interfaces::Chain::Notifications handler. */
     std::unique_ptr<interfaces::Handler> m_chain_notifications_handler;
-
-    /** Register the wallet for chain notifications */
-    void handleNotifications();
 
     /** Interface for accessing chain state. */
     interfaces::Chain& chain() const { assert(m_chain); return *m_chain; }
@@ -1339,8 +1338,14 @@ public:
     /** Return whether transaction can be abandoned */
     bool TransactionCanBeAbandoned(const uint256& hashTx) const;
 
+    /** Return whether transaction can be resent */
+    bool TransactionCanBeResent(const uint256& hashTx) const;
+
     /* Mark a transaction (and it in-wallet descendants) as abandoned so its inputs may be respent. */
     bool AbandonTransaction(const uint256& hashTx);
+
+    /* Resend a transaction */
+    bool ResendTransaction(const uint256& hashTx);
 
     //! Verify wallet naming and perform salvage on the wallet if required
     static bool Verify(interfaces::Chain& chain, const WalletLocation& location, bilingual_str& error_string, std::vector<bilingual_str>& warnings);
