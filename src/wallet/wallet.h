@@ -766,10 +766,11 @@ class WalletRescanReserver; //forward declarations for ScanForWalletTransactions
  * A CWallet is an extension of a keystore, which also maintains a set of transactions and balances,
  * and provides the ability to create new transactions.
  */
-// KNST private???
-class CWallet final : public FillableSigningProvider, private interfaces::Chain::Notifications
+class CWallet final : public FillableSigningProvider, public interfaces::Chain::Notifications
 {
 private:
+    CHDChain cryptedHDChain GUARDED_BY(cs_KeyStore);
+
     CKeyingMaterial vMasterKey GUARDED_BY(cs_KeyStore);
 
     //! if fUseCrypto is true, mapKeys must be empty
@@ -779,6 +780,9 @@ private:
     //! keeps track of whether Unlock has run a thorough check before
     bool fDecryptionThoroughlyChecked;
 
+    //! if fOnlyMixingAllowed is true, only mixing should be allowed in unlocked wallet
+    bool fOnlyMixingAllowed;
+
     using CryptedKeyMap = std::map<CKeyID, std::pair<CPubKey, std::vector<unsigned char>>>;
 
     bool SetCrypted();
@@ -786,11 +790,19 @@ private:
     //! will encrypt previously unencrypted keys
     bool EncryptKeys(CKeyingMaterial& vMasterKeyIn);
 
-    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys = false);
+    bool EncryptHDChain(const CKeyingMaterial& vMasterKeyIn, const CHDChain& chain = CHDChain());
+    bool DecryptHDChain(CHDChain& hdChainRet) const;
+    bool SetHDChain(const CHDChain& chain);
+    bool SetCryptedHDChain(const CHDChain& chain);
+
+    bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly = false, bool accept_no_keys = false);
     CryptedKeyMap mapCryptedKeys GUARDED_BY(cs_KeyStore);
 
+    bool HaveKeyInner(const CKeyID &address) const;
     bool AddCryptedKeyInner(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
     bool AddKeyPubKeyInner(const CKey& key, const CPubKey &pubkey);
+    bool GetKeyInner(const CKeyID &address, CKey& keyOut) const;
+    bool GetPubKeyInner(const CKeyID &address, CPubKey& vchPubKeyOut) const;
 
     std::atomic<bool> fAbortRescan{false};
     std::atomic<bool> fScanningWallet{false}; // controlled by WalletRescanReserver
@@ -968,6 +980,7 @@ public:
     CWallet(interfaces::Chain* chain, const WalletLocation& location, std::unique_ptr<WalletDatabase> database)
         : fUseCrypto(false),
           fDecryptionThoroughlyChecked(false),
+          fOnlyMixingAllowed(false),
           m_chain(chain),
           m_location(location),
           database(std::move(database))
@@ -985,8 +998,8 @@ public:
     /** Interface to assert chain access */
     bool HaveChain() const { return m_chain ? true : false; }
     bool IsCrypted() const { return fUseCrypto; }
-    bool IsLocked() const;
-    bool Lock();
+    bool IsLocked(bool fForMixing = false) const;
+    bool Lock(bool fForMixing = false);
 
     std::map<uint256, CWalletTx> mapWallet GUARDED_BY(cs_wallet);
 
@@ -1113,10 +1126,8 @@ public:
     bool AddCryptedKey(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
     //! Adds an encrypted key to the store, without saving it to disk (used by LoadWallet)
     bool LoadCryptedKey(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
-    bool GetKey(const CKeyID &address, CKey& keyOut) const override;
-    bool GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const override;
-    bool HaveKey(const CKeyID &address) const override;
     std::set<CKeyID> GetKeys() const override;
+    virtual bool GetHDChain(CHDChain& hdChainRet) const override;
     bool AddCScript(const CScript& redeemScript) override;
     bool LoadCScript(const CScript& redeemScript);
 

@@ -475,7 +475,7 @@ bool CWallet::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const
         return true;
     }
     else
-        return CCryptoKeyStore::GetPubKey(address, vchPubKeyOut);
+        return GetPubKeyInner(address, vchPubKeyOut);
 }
 
 bool CWallet::GetKey(const CKeyID &address, CKey& keyOut) const
@@ -503,8 +503,17 @@ bool CWallet::GetKey(const CKeyID &address, CKey& keyOut) const
         return true;
     }
     else {
-        return CCryptoKeyStore::GetKey(address, keyOut);
+        return GetKeyInner(address, keyOut);
     }
+}
+
+bool CWallet::HaveKeyInner(const CKeyID &address) const
+{
+    LOCK(cs_KeyStore);
+    if (!IsCrypted()) {
+        return FillableSigningProvider::HaveKey(address);
+    }
+    return mapCryptedKeys.count(address) > 0;
 }
 
 bool CWallet::HaveKey(const CKeyID &address) const
@@ -512,7 +521,7 @@ bool CWallet::HaveKey(const CKeyID &address) const
     LOCK(cs_wallet);
     if (mapHdPubKeys.count(address) > 0)
         return true;
-    return CCryptoKeyStore::HaveKey(address);
+    return HaveKeyInner(address);
 }
 
 bool CWallet::LoadHDPubKey(const CHDPubKey &hdPubKey)
@@ -2028,7 +2037,7 @@ bool CWallet::SetHDChain(WalletBatch &batch, const CHDChain& chain, bool memonly
 {
     LOCK(cs_wallet);
 
-    if (!CCryptoKeyStore::SetHDChain(chain))
+    if (!SetHDChain(chain))
         return false;
 
     if (!memonly) {
@@ -2046,7 +2055,7 @@ bool CWallet::SetCryptedHDChain(WalletBatch &batch, const CHDChain& chain, bool 
 {
     LOCK(cs_wallet);
 
-    if (!CCryptoKeyStore::SetCryptedHDChain(chain))
+    if (!SetCryptedHDChain(chain))
         return false;
 
     if (!memonly) {
@@ -5783,30 +5792,51 @@ bool CWallet::SetCrypted()
     return true;
 }
 
-bool CWallet::IsLocked() const
+// This function should be used in a different combinations to determine
+// if FillableSigningProvider is fully locked so that no operations requiring access
+// to private keys are possible:
+//      IsLocked(true)
+// or if FillableSigningProvider's private keys are available for mixing only:
+//      !IsLocked(true) && IsLocked()
+// or if they are available for everything:
+//      !IsLocked()
+bool CWallet::IsLocked(bool fForMixing) const
 {
-    if (!IsCrypted()) {
+    if (!IsCrypted())
         return false;
+    bool result;
+    {
+        LOCK(cs_KeyStore);
+        result = vMasterKey.empty();
     }
-    LOCK(cs_KeyStore);
-    return vMasterKey.empty();
+    // fForMixing   fOnlyMixingAllowed  return
+    // ---------------------------------------
+    // true         true                result
+    // true         false               result
+    // false        true                true
+    // false        false               result
+
+    if(!fForMixing && fOnlyMixingAllowed) return true;
+
+    return result;
 }
 
-bool CWallet::Lock()
+bool CWallet::Lock(bool fAllowMixing)
 {
     if (!SetCrypted())
         return false;
 
-    {
+    if(!fAllowMixing) {
         LOCK(cs_KeyStore);
         vMasterKey.clear();
     }
 
+    fOnlyMixingAllowed = fAllowMixing;
     NotifyStatusChanged(this);
     return true;
 }
 
-bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
+bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly, bool accept_no_keys)
 {
     {
         LOCK(cs_KeyStore);
@@ -5835,25 +5865,66 @@ bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool accept_no_keys)
             LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
             throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
         }
-        if (keyFail || (!keyPass && !accept_no_keys))
+        if (keyFail || (!keyPass && cryptedHDChain.IsNull() && !accept_no_keys))
             return false;
+
         vMasterKey = vMasterKeyIn;
+
+        if(!cryptedHDChain.IsNull()) {
+            bool chainPass = false;
+            // try to decrypt seed and make sure it matches
+            CHDChain hdChainTmp;
+            if (DecryptHDChain(hdChainTmp)) {
+                // make sure seed matches this chain
+                chainPass = cryptedHDChain.GetID() == hdChainTmp.GetSeedHash();
+            }
+            if (!chainPass) {
+                vMasterKey.clear();
+                return false;
+            }
+        }
         fDecryptionThoroughlyChecked = true;
     }
+    fOnlyMixingAllowed = fForMixingOnly;
     NotifyStatusChanged(this);
     return true;
 }
 
-bool CWallet::HaveKey(const CKeyID &address) const
+bool CWallet::AddKeyPubKeyInner(const CKey& key, const CPubKey &pubkey)
 {
     LOCK(cs_KeyStore);
     if (!IsCrypted()) {
-        return FillableSigningProvider::HaveKey(address);
+        return FillableSigningProvider::AddKeyPubKey(key, pubkey);
     }
-    return mapCryptedKeys.count(address) > 0;
+
+    if (IsLocked(true)) {
+        return false;
+    }
+
+    std::vector<unsigned char> vchCryptedSecret;
+    CKeyingMaterial vchSecret(key.begin(), key.end());
+    if (!EncryptSecret(vMasterKey, vchSecret, pubkey.GetHash(), vchCryptedSecret)) {
+        return false;
+    }
+
+    if (!AddCryptedKey(pubkey, vchCryptedSecret)) {
+        return false;
+    }
+    return true;
 }
 
-bool CWallet::GetKey(const CKeyID &address, CKey& keyOut) const
+bool CWallet::AddCryptedKeyInner(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret)
+{
+    LOCK(cs_KeyStore);
+    if (!SetCrypted()) {
+        return false;
+    }
+
+    mapCryptedKeys[vchPubKey.GetID()] = make_pair(vchPubKey, vchCryptedSecret);
+    return true;
+}
+
+bool CWallet::GetKeyInner(const CKeyID &address, CKey& keyOut) const
 {
     LOCK(cs_KeyStore);
     if (!IsCrypted()) {
@@ -5870,7 +5941,7 @@ bool CWallet::GetKey(const CKeyID &address, CKey& keyOut) const
     return false;
 }
 
-bool CWallet::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const
+bool CWallet::GetPubKeyInner(const CKeyID &address, CPubKey& vchPubKeyOut) const
 {
     LOCK(cs_KeyStore);
     if (!IsCrypted())
@@ -5921,38 +5992,151 @@ bool CWallet::EncryptKeys(CKeyingMaterial& vMasterKeyIn)
     return true;
 }
 
-bool CWallet::AddKeyPubKeyInner(const CKey& key, const CPubKey &pubkey)
+bool CWallet::EncryptHDChain(const CKeyingMaterial& vMasterKeyIn, const CHDChain& chain)
 {
     LOCK(cs_KeyStore);
-    if (!IsCrypted()) {
-        return FillableSigningProvider::AddKeyPubKey(key, pubkey);
+    // should call EncryptKeys first
+    if (!IsCrypted())
+        return false;
+
+    if (!cryptedHDChain.IsNull())
+        return true;
+
+    if (cryptedHDChain.IsCrypted())
+        return true;
+
+    if (hdChain.IsNull() && !chain.IsNull()) {
+        // Encrypting a new HDChain for an already encrypted non-HD wallet
+        hdChain = chain;
     }
 
-    if (IsLocked()) {
+    // make sure seed matches this chain
+    if (hdChain.GetID() != hdChain.GetSeedHash())
         return false;
+
+    std::vector<unsigned char> vchCryptedSeed;
+    if (!EncryptSecret(vMasterKeyIn, hdChain.GetSeed(), hdChain.GetID(), vchCryptedSeed))
+        return false;
+
+    hdChain.Debug(__func__);
+    cryptedHDChain = hdChain;
+    cryptedHDChain.SetCrypted(true);
+
+    SecureVector vchSecureCryptedSeed(vchCryptedSeed.begin(), vchCryptedSeed.end());
+    if (!cryptedHDChain.SetSeed(vchSecureCryptedSeed, false))
+        return false;
+
+    SecureVector vchMnemonic;
+    SecureVector vchMnemonicPassphrase;
+
+    // it's ok to have no mnemonic if wallet was initialized via hdseed
+    if (hdChain.GetMnemonic(vchMnemonic, vchMnemonicPassphrase)) {
+        std::vector<unsigned char> vchCryptedMnemonic;
+        std::vector<unsigned char> vchCryptedMnemonicPassphrase;
+
+        if (!vchMnemonic.empty() && !EncryptSecret(vMasterKeyIn, vchMnemonic, hdChain.GetID(), vchCryptedMnemonic))
+            return false;
+        if (!vchMnemonicPassphrase.empty() && !EncryptSecret(vMasterKeyIn, vchMnemonicPassphrase, hdChain.GetID(), vchCryptedMnemonicPassphrase))
+            return false;
+
+        SecureVector vchSecureCryptedMnemonic(vchCryptedMnemonic.begin(), vchCryptedMnemonic.end());
+        SecureVector vchSecureCryptedMnemonicPassphrase(vchCryptedMnemonicPassphrase.begin(), vchCryptedMnemonicPassphrase.end());
+        if (!cryptedHDChain.SetMnemonic(vchSecureCryptedMnemonic, vchSecureCryptedMnemonicPassphrase, false))
+            return false;
     }
 
-    std::vector<unsigned char> vchCryptedSecret;
-    CKeyingMaterial vchSecret(key.begin(), key.end());
-    if (!EncryptSecret(vMasterKey, vchSecret, pubkey.GetHash(), vchCryptedSecret)) {
+    if (!hdChain.SetNull())
         return false;
-    }
 
-    if (!AddCryptedKey(pubkey, vchCryptedSecret)) {
-        return false;
-    }
     return true;
 }
 
-
-bool CWallet::AddCryptedKeyInner(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret)
+bool CWallet::DecryptHDChain(CHDChain& hdChainRet) const
 {
     LOCK(cs_KeyStore);
-    if (!SetCrypted()) {
+    if (!IsCrypted())
+        return true;
+
+    if (cryptedHDChain.IsNull())
         return false;
+
+    if (!cryptedHDChain.IsCrypted())
+        return false;
+
+    SecureVector vchSecureSeed;
+    SecureVector vchSecureCryptedSeed = cryptedHDChain.GetSeed();
+    std::vector<unsigned char> vchCryptedSeed(vchSecureCryptedSeed.begin(), vchSecureCryptedSeed.end());
+    if (!DecryptSecret(vMasterKey, vchCryptedSeed, cryptedHDChain.GetID(), vchSecureSeed))
+        return false;
+
+    hdChainRet = cryptedHDChain;
+    if (!hdChainRet.SetSeed(vchSecureSeed, false))
+        return false;
+
+    // hash of decrypted seed must match chain id
+    if (hdChainRet.GetSeedHash() != cryptedHDChain.GetID())
+        return false;
+
+    SecureVector vchSecureCryptedMnemonic;
+    SecureVector vchSecureCryptedMnemonicPassphrase;
+
+    // it's ok to have no mnemonic if wallet was initialized via hdseed
+    if (cryptedHDChain.GetMnemonic(vchSecureCryptedMnemonic, vchSecureCryptedMnemonicPassphrase)) {
+        SecureVector vchSecureMnemonic;
+        SecureVector vchSecureMnemonicPassphrase;
+
+        std::vector<unsigned char> vchCryptedMnemonic(vchSecureCryptedMnemonic.begin(), vchSecureCryptedMnemonic.end());
+        std::vector<unsigned char> vchCryptedMnemonicPassphrase(vchSecureCryptedMnemonicPassphrase.begin(), vchSecureCryptedMnemonicPassphrase.end());
+
+        if (!vchCryptedMnemonic.empty() && !DecryptSecret(vMasterKey, vchCryptedMnemonic, cryptedHDChain.GetID(), vchSecureMnemonic))
+            return false;
+        if (!vchCryptedMnemonicPassphrase.empty() && !DecryptSecret(vMasterKey, vchCryptedMnemonicPassphrase, cryptedHDChain.GetID(), vchSecureMnemonicPassphrase))
+            return false;
+
+        if (!hdChainRet.SetMnemonic(vchSecureMnemonic, vchSecureMnemonicPassphrase, false))
+            return false;
     }
 
-    mapCryptedKeys[vchPubKey.GetID()] = make_pair(vchPubKey, vchCryptedSecret);
-    ImplicitlyLearnRelatedKeyScripts(vchPubKey);
+    hdChainRet.SetCrypted(false);
+    hdChainRet.Debug(__func__);
+
     return true;
+}
+
+bool CWallet::SetHDChain(const CHDChain& chain)
+{
+    LOCK(cs_KeyStore);
+    if (IsCrypted())
+        return false;
+
+    if (chain.IsCrypted())
+        return false;
+
+    hdChain = chain;
+    return true;
+}
+
+bool CWallet::SetCryptedHDChain(const CHDChain& chain)
+{
+    LOCK(cs_KeyStore);
+    if (!SetCrypted())
+        return false;
+
+    if (!chain.IsCrypted())
+        return false;
+
+    cryptedHDChain = chain;
+    return true;
+}
+
+bool CWallet::GetHDChain(CHDChain& hdChainRet) const
+{
+    LOCK(cs_KeyStore);
+    if(IsCrypted()) {
+        hdChainRet = cryptedHDChain;
+        return !cryptedHDChain.IsNull();
+    }
+
+    hdChainRet = hdChain;
+    return !hdChain.IsNull();
 }
