@@ -82,7 +82,7 @@ static void FundTransaction(CMutableTransaction& tx, SimpleUTXOMap& utoxs, const
 
 static void SignTransaction(const CTxMemPool& mempool, CMutableTransaction& tx, const CKey& coinbaseKey)
 {
-    CBasicKeyStore tempKeystore;
+    FillableSigningProvider tempKeystore;
     tempKeystore.AddKeyPubKey(coinbaseKey, coinbaseKey.GetPubKey());
 
     for (size_t i = 0; i < tx.vin.size(); i++) {
