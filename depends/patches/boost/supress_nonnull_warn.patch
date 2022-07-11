@@ -1,0 +1,32 @@
+--- old/boost/concept/usage.hpp
++++ new/boost/concept/usage.hpp
+@@ -13,7 +13,10 @@
+ template <class Model>
+ struct usage_requirements
+ {
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wnonnull"
+     ~usage_requirements() { ((Model*)0)->~Model(); }
++#pragma GCC diagnostic pop
+ };
+ 
+ #  if BOOST_WORKAROUND(__GNUC__, <= 3)
+--- old/boost/concept/detail/general.hpp
++++ new/boost/concept/detail/general.hpp
+@@ -25,6 +25,8 @@
+   template <void(*)()> struct instantiate {};
+ }
+ 
++#pragma GCC diagnostic push
++#pragma GCC diagnostic ignored "-Wnonnull"
+ template <class Model>
+ struct requirement
+ {
+@@ -46,6 +48,7 @@
+ {
+     static void failed() { ((Model*)0)->constraints(); }
+ };
++#pragma GCC diagnostic pop
+   
+ template <class Model>
+ struct requirement_<void(*)(Model)>

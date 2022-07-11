@@ -4,6 +4,7 @@ $(package)_download_path=https://boostorg.jfrog.io/artifactory/main/release/$(su
 $(package)_file_name=boost_$($(package)_version).tar.bz2
 $(package)_sha256_hash=4eb3b8d442b426dc35346235c8733b5ae35ba431690e38c6a8263dce9fcbb402
 $(package)_dependencies=native_b2
+$(package)_patches = supress_nonnull_warn.patch
 
 define $(package)_set_vars
 $(package)_config_opts_release=variant=release
@@ -34,6 +35,7 @@ endef
 
 # Fix unused variable in boost_process, can be removed after upgrading to 1.72
 define $(package)_preprocess_cmds
+  patch -p1 -i $($(package)_patch_dir)/supress_nonnull_warn.patch && \
   sed -i.old "s/int ret_sig = 0;//" boost/process/detail/posix/wait_group.hpp && \
   echo "using $($(package)_toolset_$(host_os)) : : $($(package)_cxx) : <cflags>\"$($(package)_cflags)\" <cxxflags>\"$($(package)_cxxflags)\" <compileflags>\"$($(package)_cppflags)\" <linkflags>\"$($(package)_ldflags)\" <archiver>\"$($(package)_ar)\" <striper>\"$(host_STRIP)\"  <ranlib>\"$(host_RANLIB)\" <rc>\"$(host_WINDRES)\" : ;" > user-config.jam
 endef
