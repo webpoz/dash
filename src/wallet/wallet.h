@@ -646,8 +646,6 @@ class WalletRescanReserver; //forward declarations for ScanForWalletTransactions
 class CWallet final : public WalletStorage, public interfaces::Chain::Notifications
 {
 private:
-    CHDChain cryptedHDChain GUARDED_BY(cs_KeyStore);
-
     CKeyingMaterial vMasterKey GUARDED_BY(cs_KeyStore);
 
     //! if fUseCrypto is true, mapKeys must be empty
@@ -661,11 +659,6 @@ private:
     bool fOnlyMixingAllowed;
 
     bool SetCrypted();
-
-    bool EncryptHDChain(const CKeyingMaterial& vMasterKeyIn, const CHDChain& chain = CHDChain());
-    bool DecryptHDChain(CHDChain& hdChainRet) const;
-    bool SetHDChain(const CHDChain& chain);
-    bool SetCryptedHDChain(const CHDChain& chain);
 
     bool Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly = false, bool accept_no_keys = false);
 
@@ -835,9 +828,6 @@ public:
     bool IsLocked(bool fForMixing = false) const override;
     bool Lock(bool fForMixing = false);
 
-    /** Interface to assert chain access and if successful lock it */
-    std::unique_ptr<interfaces::Chain::Lock> LockChain() { return m_chain ? m_chain->lock() : nullptr; }
-
     std::map<uint256, CWalletTx> mapWallet GUARDED_BY(cs_wallet);
 
     typedef std::multimap<int64_t, CWalletTx*> TxItems;
@@ -851,8 +841,6 @@ public:
     std::set<COutPoint> setLockedCoins GUARDED_BY(cs_wallet);
 
     int64_t nKeysLeftSinceAutoBackup;
-
-    std::map<CKeyID, CHDPubKey> mapHdPubKeys; //<! memory map of HD extended pubkeys
 
     /** Registered interfaces::Chain::Notifications handler. */
     std::unique_ptr<interfaces::Handler> m_chain_notifications_handler;
@@ -929,6 +917,9 @@ public:
     bool IsScanning() { return fScanningWallet; }
     int64_t ScanningDuration() const { return fScanningWallet ? GetTimeMillis() - m_scanning_start : 0; }
     double ScanningProgress() const { return fScanningWallet ? (double) m_scanning_progress : 0; }
+
+    //! Upgrade stored CKeyMetadata objects to store key origin info as KeyOriginInfo
+    void UpgradeKeyMetadata() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     bool LoadMinVersion(int nVersion) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(cs_wallet); nWalletVersion = nVersion; nWalletMaxVersion = std::max(nWalletMaxVersion, nVersion); return true; }
 
@@ -1061,12 +1052,17 @@ public:
     /** Absolute maximum transaction fee (in satoshis) used by default for the wallet */
     CAmount m_default_max_tx_fee{DEFAULT_TRANSACTION_MAXFEE};
 
+    size_t KeypoolCountExternalKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    size_t KeypoolCountInternalKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool TopUpKeyPool(unsigned int kpSize = 0);
+
+    int64_t GetOldestKeyPoolTime();
+
     std::set<std::set<CTxDestination>> GetAddressGroupings() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     std::map<CTxDestination, CAmount> GetAddressBalances();
 
     std::set<CTxDestination> GetLabelAddresses(const std::string& label) const;
 
-    bool GetNewDestination(const OutputType type, const std::string label, CTxDestination& dest, std::string& error);
     bool GetNewChangeDestination(const OutputType type, CTxDestination& dest, std::string& error);
 
     isminetype IsMine(const CTxDestination& dest) const;
@@ -1096,6 +1092,7 @@ public:
     void AutoLockMasternodeCollaterals();
     DBErrors ZapSelectTx(std::vector<uint256>& vHashIn, std::vector<uint256>& vHashOut) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
+    bool SetAddressBookWithDB(WalletBatch& batch, const CTxDestination& address, const std::string& strName, const std::string& strPurpose);
     bool SetAddressBook(const CTxDestination& address, const std::string& strName, const std::string& purpose);
 
     bool DelAddressBook(const CTxDestination& address);
@@ -1267,6 +1264,29 @@ public:
         m_last_block_processed_height = block_height;
         m_last_block_processed = block_hash;
     };
+
+    ScriptPubKeyMan* GetScriptPubKeyMan() const;
+    const SigningProvider* GetSigningProvider() const;
+    LegacyScriptPubKeyMan* GetLegacyScriptPubKeyMan() const;
+
+    // Temporary LegacyScriptPubKeyMan accessors and aliases.
+    friend class LegacyScriptPubKeyMan;
+    std::unique_ptr<LegacyScriptPubKeyMan> m_spk_man = MakeUnique<LegacyScriptPubKeyMan>(*this);
+    CCriticalSection& cs_KeyStore = m_spk_man->cs_KeyStore;
+    LegacyScriptPubKeyMan::KeyMap& mapKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapKeys;
+    LegacyScriptPubKeyMan::ScriptMap& mapScripts GUARDED_BY(cs_KeyStore) = m_spk_man->mapScripts;
+    LegacyScriptPubKeyMan::CryptedKeyMap& mapCryptedKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapCryptedKeys;
+    LegacyScriptPubKeyMan::WatchOnlySet& setWatchOnly GUARDED_BY(cs_KeyStore) = m_spk_man->setWatchOnly;
+    LegacyScriptPubKeyMan::WatchKeyMap& mapWatchKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapWatchKeys;
+    WalletBatch*& encrypted_batch GUARDED_BY(cs_wallet) = m_spk_man->encrypted_batch;
+    std::set<int64_t>& setInternalKeyPool GUARDED_BY(cs_wallet) = m_spk_man->setInternalKeyPool;
+    std::set<int64_t>& setExternalKeyPool GUARDED_BY(cs_wallet) = m_spk_man->setExternalKeyPool;
+    int64_t& nTimeFirstKey GUARDED_BY(cs_wallet) = m_spk_man->nTimeFirstKey;
+    std::map<CKeyID, CKeyMetadata>& mapKeyMetadata GUARDED_BY(cs_wallet) = m_spk_man->mapKeyMetadata;
+    std::map<CScriptID, CKeyMetadata>& m_script_metadata GUARDED_BY(cs_wallet) = m_spk_man->m_script_metadata;
+    void MarkPreSplitKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(m_spk_man->cs_wallet); m_spk_man->MarkPreSplitKeys(); }
+    void MarkReserveKeysAsUsed(int64_t keypool_id) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(m_spk_man->cs_wallet); m_spk_man->MarkReserveKeysAsUsed(keypool_id); }
+    using CryptedKeyMap = LegacyScriptPubKeyMan::CryptedKeyMap;
 };
 
 /**

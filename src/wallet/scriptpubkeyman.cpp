@@ -137,7 +137,7 @@ IsMineResult IsMineInner(const LegacyScriptPubKeyMan& keystore, const CScript& s
 
 } // namespace
 
-isminetype LegacyScriptPubKeyMan::IsMine(const CScript& scriptPubKey)
+isminetype LegacyScriptPubKeyMan::IsMine(const CScript& scriptPubKey) const
 {
     switch (IsMineInner(*this, scriptPubKey, IsMineSigVersion::TOP)) {
     case IsMineResult::INVALID:
@@ -151,10 +151,10 @@ isminetype LegacyScriptPubKeyMan::IsMine(const CScript& scriptPubKey)
     assert(false);
 }
 
-isminetype LegacyScriptPubKeyMan::IsMine(const CTxDestination& dest)
+isminetype LegacyScriptPubKeyMan::IsMine(const CTxDestination& dest) const
 {
     CScript script = GetScriptForDestination(dest);
-    return IsMine(*this, script);
+    return IsMine(script);
 }
 
 std::vector<CKeyID> GetAffectedKeys(const CScript& spk, const SigningProvider& provider)
@@ -370,7 +370,7 @@ bool LegacyScriptPubKeyMan::AddHDPubKey(WalletBatch &batch, const CExtPubKey &ex
     if (!batch.WriteHDPubKey(hdPubKey, mapKeyMetadata[extPubKey.pubkey.GetID()])) {
         return false;
     }
-    m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+    m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
     return true;
 }
 
@@ -409,7 +409,7 @@ bool LegacyScriptPubKeyMan::AddKeyPubKeyWithDB(WalletBatch& batch, const CKey& s
                                  secret.GetPrivKey(),
                                  mapKeyMetadata[pubkey.GetID()]);
     }
-    m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+    m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
     return true;
 }
 
@@ -549,7 +549,7 @@ bool LegacyScriptPubKeyMan::AddCScriptWithDB(WalletBatch& batch, const CScript& 
     if (!FillableSigningProvider::AddCScript(redeemScript))
         return false;
     if (batch.WriteCScript(Hash160(redeemScript), redeemScript)) {
-        m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
         return true;
     }
     return false;
@@ -596,7 +596,7 @@ bool LegacyScriptPubKeyMan::AddWatchOnlyWithDB(WalletBatch &batch, const CScript
     UpdateTimeFirstKey(meta.nCreateTime);
     NotifyWatchonlyChanged(true);
     if (batch.WriteWatchOnly(dest, meta)) {
-        m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
         return true;
     }
     return false;
@@ -657,37 +657,6 @@ bool LegacyScriptPubKeyMan::HaveWatchOnly() const
     return (!setWatchOnly.empty());
 }
 
-bool LegacyScriptPubKeyMan::Unlock(const SecureString& strWalletPassphrase, bool fForMixingOnly, bool accept_no_keys)
-{
-    if (!m_storage.IsLocked()) // was already fully unlocked, not only for mixing
-        return true;
-
-    CCrypter crypter;
-    CKeyingMaterial _vMasterKey;
-
-    {
-        LOCK(cs_wallet);
-        for (const MasterKeyMap::value_type& pMasterKey : mapMasterKeys)
-        {
-            if (!crypter.SetKeyFromPassphrase(strWalletPassphrase, pMasterKey.second.vchSalt, pMasterKey.second.nDeriveIterations, pMasterKey.second.nDerivationMethod))
-                return false;
-            if (!crypter.Decrypt(pMasterKey.second.vchCryptedKey, _vMasterKey))
-                continue; // try another master key
-            if (Unlock(_vMasterKey, fForMixingOnly, accept_no_keys)) {
-                // Now that we've unlocked, upgrade the key metadata
-                UpgradeKeyMetadata();
-                if(nWalletBackups == -2) {
-                    TopUpKeyPool();
-                    WalletLogPrintf("Keypool replenished, re-initializing automatic backups.\n");
-                    nWalletBackups = gArgs.GetArg("-createwalletbackups", 10);
-                }
-                return true;
-            }
-        }
-    }
-    return false;
-}
-
 void LegacyScriptPubKeyMan::GenerateNewHDChain(const SecureString& secureMnemonic, const SecureString& secureMnemonicPassphrase)
 {
     assert(!m_storage.IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS));
@@ -735,7 +704,7 @@ bool LegacyScriptPubKeyMan::GenerateNewHDChainEncrypted(const SecureString& secu
     hdChainTmp.AddAccount();
     hdChainTmp.Debug(__func__);
 
-    for (const MasterKeyMap::value_type& pMasterKey : mapMasterKeys) {
+    for (const CWallet::MasterKeyMap::value_type& pMasterKey : m_wallet.mapMasterKeys) {
         if (!crypter.SetKeyFromPassphrase(secureWalletPassphrase, pMasterKey.second.vchSalt, pMasterKey.second.nDeriveIterations, pMasterKey.second.nDerivationMethod)) {
             return false;
         }
@@ -763,15 +732,15 @@ bool LegacyScriptPubKeyMan::GenerateNewHDChainEncrypted(const SecureString& secu
         hdChainCrypted.Debug(__func__);
 
         if (SetCryptedHDChainSingle(hdChainCrypted, false)) {
-            Lock();
-            if (!Unlock(secureWalletPassphrase)) {
+            m_wallet.Lock();
+            if (!m_wallet.Unlock(secureWalletPassphrase)) {
                 // this should never happen
                 throw std::runtime_error(std::string(__func__) + ": Unlock failed");
             }
             if (!NewKeyPool()) {
                 throw std::runtime_error(std::string(__func__) + ": NewKeyPool failed");
             }
-            Lock();
+            m_wallet.Lock();
             return true;
         }
     }
@@ -791,7 +760,7 @@ bool LegacyScriptPubKeyMan::SetHDChain(WalletBatch &batch, const CHDChain& chain
             throw std::runtime_error(std::string(__func__) + ": WriteHDChain failed");
         }
 
-        m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
     }
 
     return true;
@@ -812,7 +781,7 @@ bool LegacyScriptPubKeyMan::SetCryptedHDChain(WalletBatch &batch, const CHDChain
             if (!batch.WriteCryptedHDChain(chain))
                 throw std::runtime_error(std::string(__func__) + ": WriteCryptedHDChain failed");
         }
-        m_storage.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
+        m_wallet.UnsetWalletFlag(batch, WALLET_FLAG_BLANK_WALLET);
     }
 
     return true;
@@ -978,11 +947,11 @@ bool LegacyScriptPubKeyMan::NewKeyPool()
             batch.ErasePool(nIndex);
         }
         setExternalKeyPool.clear();
-        auto it = coinJoinClientManagers.find(GetName());
+        auto it = coinJoinClientManagers.find(m_wallet.GetName());
         if (it != coinJoinClientManagers.end()) {
             it->second->StopMixing();
         }
-        nKeysLeftSinceAutoBackup = 0;
+        m_wallet.nKeysLeftSinceAutoBackup = 0;
 
         m_pool_key_to_index.clear();
 
@@ -1156,9 +1125,9 @@ void LegacyScriptPubKeyMan::KeepKey(int64_t nIndex)
         LOCK(cs_wallet);
         WalletBatch batch(m_storage.GetDatabase());
         if (batch.ErasePool(nIndex))
-            --nKeysLeftSinceAutoBackup;
+            --m_wallet.nKeysLeftSinceAutoBackup;
         if (!nWalletBackups)
-            nKeysLeftSinceAutoBackup = 0;
+            m_wallet.nKeysLeftSinceAutoBackup = 0;
     }
     WalletLogPrintf("keypool keep %d\n", nIndex);
 }
@@ -1282,75 +1251,6 @@ bool LegacyScriptPubKeyMan::AddKeyOrigin(const CPubKey& pubkey, const KeyOriginI
     mapKeyMetadata[pubkey.GetID()].key_origin.path = info.path;
     mapKeyMetadata[pubkey.GetID()].has_key_origin = true;
     return WriteKeyMetadata(mapKeyMetadata[pubkey.GetID()], pubkey, true);
-}
-
-bool LegacyScriptPubKeyMan::Lock(bool fAllowMixing)
-{
-    if (!SetCrypted())
-        return false;
-
-    if(!fAllowMixing) {
-        LOCK(cs_KeyStore);
-        vMasterKey.clear();
-    }
-
-    fOnlyMixingAllowed = fAllowMixing;
-    NotifyStatusChanged(this);
-    return true;
-}
-
-bool LegacyScriptPubKeyMan::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly, bool accept_no_keys)
-{
-    {
-        LOCK(cs_KeyStore);
-        if (!SetCrypted())
-            return false;
-
-        bool keyPass = mapCryptedKeys.empty(); // Always pass when there are no encrypted keys
-        bool keyFail = false;
-        CryptedKeyMap::const_iterator mi = mapCryptedKeys.begin();
-        for (; mi != mapCryptedKeys.end(); ++mi)
-        {
-            const CPubKey &vchPubKey = (*mi).second.first;
-            const std::vector<unsigned char> &vchCryptedSecret = (*mi).second.second;
-            CKey key;
-            if (!DecryptKey(vMasterKeyIn, vchCryptedSecret, vchPubKey, key))
-            {
-                keyFail = true;
-                break;
-            }
-            keyPass = true;
-            if (fDecryptionThoroughlyChecked)
-                break;
-        }
-        if (keyPass && keyFail)
-        {
-            LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
-            throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
-        }
-        if (keyFail || (!keyPass && cryptedHDChain.IsNull() && !accept_no_keys))
-            return false;
-
-        vMasterKey = vMasterKeyIn;
-
-        if(!cryptedHDChain.IsNull()) {
-            bool chainPass = false;
-            // try to decrypt seed and make sure it matches
-            CHDChain hdChainTmp;
-            if (DecryptHDChain(hdChainTmp)) {
-                // make sure seed matches this chain
-                chainPass = cryptedHDChain.GetID() == hdChainTmp.GetSeedHash();
-            }
-            if (!chainPass) {
-                vMasterKey.clear();
-                return false;
-            }
-        }
-        fDecryptionThoroughlyChecked = true;
-    }
-    fOnlyMixingAllowed = fForMixingOnly;
-    NotifyStatusChanged(this);
-    return true;
 }
 
 bool LegacyScriptPubKeyMan::AddKeyPubKeyInner(const CKey& key, const CPubKey &pubkey)

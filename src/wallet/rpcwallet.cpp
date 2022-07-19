@@ -189,6 +189,10 @@ UniValue getnewaddress(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
+    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
+    if (!spk_man) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+    }
     LOCK(pwallet->cs_wallet);
 
     if (!pwallet->CanGetAddresses()) {
@@ -206,7 +210,7 @@ UniValue getnewaddress(const JSONRPCRequest& request)
 
     // Generate a new key that is added to wallet
     CPubKey newKey;
-    if (!pwallet->GetKeyFromPool(newKey, false)) {
+    if (!spk_man->GetKeyFromPool(newKey, false)) {
         throw JSONRPCError(RPC_WALLET_KEYPOOL_RAN_OUT, "Error: Keypool ran out, please call keypoolrefill first");
     }
     CKeyID keyID = newKey.GetID();
@@ -587,7 +591,7 @@ static UniValue signmessage(const JSONRPCRequest& request)
     const SigningProvider* provider = pwallet->GetSigningProvider();
 
     CKey key;
-    if (!provider->GetKey(keyID, key)) {
+    if (!provider->GetKey(*keyID, key)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Private key not available");
     }
 
@@ -995,6 +999,11 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
 
+    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
+    if (!spk_man) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+    }
+
     LOCK(pwallet->cs_wallet);
 
     std::string label;
@@ -1017,7 +1026,7 @@ static UniValue addmultisigaddress(const JSONRPCRequest& request)
     // Construct using pay-to-script-hash:
     CScript inner = CreateMultisigRedeemscript(required, pubkeys);
     CScriptID innerID(inner);
-    pwallet->AddCScript(inner);
+    spk_man->AddCScript(inner);
 
     pwallet->SetAddressBook(innerID, label, "send");
 
@@ -1128,7 +1137,7 @@ static UniValue ListReceived(CWallet * const pwallet, const UniValue& params, bo
         if (it == mapTally.end() && !fIncludeEmpty)
             continue;
 
-        isminefilter mine = IsMine(*pwallet, address);
+        isminefilter mine = pwallet->IsMine(address);
         if(!(mine & filter))
             continue;
 
@@ -2428,8 +2437,9 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
 
     LOCK(pwallet->cs_wallet);
 
+    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
     CHDChain hdChainCurrent;
-    bool fHDEnabled = pwallet->GetHDChain(hdChainCurrent);
+    bool fHDEnabled = spk_man && spk_man->GetHDChain(hdChainCurrent);
     UniValue obj(UniValue::VOBJ);
 
     const auto bal = pwallet->GetBalance();
@@ -2440,10 +2450,12 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
     obj.pushKV("unconfirmed_balance", ValueFromAmount(bal.m_mine_untrusted_pending));
     obj.pushKV("immature_balance", ValueFromAmount(bal.m_mine_immature));
     obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
-    obj.pushKV("timefirstkey", pwallet->GetTimeFirstKey());
-    obj.pushKV("keypoololdest", pwallet->GetOldestKeyPoolTime());
-    obj.pushKV("keypoolsize",   (int64_t)pwallet->KeypoolCountExternalKeys());
-    obj.pushKV("keypoolsize_hd_internal",   (int64_t)(pwallet->KeypoolCountInternalKeys()));
+    if (spk_man) {
+        obj.pushKV("timefirstkey", spk_man->GetTimeFirstKey());
+        obj.pushKV("keypoololdest", spk_man->GetOldestKeyPoolTime());
+        obj.pushKV("keypoolsize",   (int64_t)spk_man->KeypoolCountExternalKeys());
+        obj.pushKV("keypoolsize_hd_internal",   (int64_t)(spk_man->KeypoolCountInternalKeys()));
+    }
     obj.pushKV("keys_left",     pwallet->nKeysLeftSinceAutoBackup);
     if (pwallet->IsCrypted())
         obj.pushKV("unlocked_until", pwallet->nRelockTime);
@@ -2568,6 +2580,10 @@ static UniValue upgradetohd(const JSONRPCRequest& request)
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     if (!wallet) return NullUniValue;
     CWallet* const pwallet = wallet.get();
+    LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
+    if (!spk_man) {
+        throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+    }
 
     LOCK(pwallet->cs_wallet);
 
@@ -2622,11 +2638,11 @@ static UniValue upgradetohd(const JSONRPCRequest& request)
     pwallet->SetMinVersion(FEATURE_HD);
 
     if (prev_encrypted) {
-        if (!pwallet->GenerateNewHDChainEncrypted(secureMnemonic, secureMnemonicPassphrase, secureWalletPassphrase)) {
+        if (!spk_man->GenerateNewHDChainEncrypted(secureMnemonic, secureMnemonicPassphrase, secureWalletPassphrase)) {
             throw JSONRPCError(RPC_WALLET_ERROR, "Failed to generate encrypted HD wallet");
         }
     } else {
-        pwallet->GenerateNewHDChain(secureMnemonic, secureMnemonicPassphrase);
+        spk_man->GenerateNewHDChain(secureMnemonic, secureMnemonicPassphrase);
         if (!secureWalletPassphrase.empty()) {
             if (!pwallet->EncryptWallet(secureWalletPassphrase)) {
                 throw JSONRPCError(RPC_WALLET_ENCRYPTION_FAILED, "Failed to encrypt HD wallet");
@@ -3449,7 +3465,7 @@ class DescribeWalletAddressVisitor : public boost::static_visitor<UniValue>
 public:
     const SigningProvider * const provider;
 
-    explicit DescribeWalletAddressVisitor(CWallet *_pwallet) : pwallet(_pwallet) {}
+    explicit DescribeWalletAddressVisitor(const SigningProvider * const _provider) : provider(_provider) {}
 
     UniValue operator()(const CNoDestination &dest) const { return UniValue(UniValue::VOBJ); }
 
@@ -3612,7 +3628,8 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
     if (meta) {
         ret.pushKV("timestamp", meta->nCreateTime);
         CHDChain hdChainCurrent;
-        if (key_id && pwallet->mapHdPubKeys.count(*key_id) && pwallet->GetHDChain(hdChainCurrent)) {
+        LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
+        if (key_id && spk_man && spk_man->mapHdPubKeys.count(*key_id) && spk_man->GetHDChain(hdChainCurrent)) {
             ret.pushKV("hdchainid", hdChainCurrent.GetID().GetHex());
         }
         if (meta->has_key_origin) {

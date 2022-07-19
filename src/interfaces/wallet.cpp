@@ -183,10 +183,26 @@ public:
     std::string getWalletName() override { return m_wallet->GetName(); }
     bool getKeyFromPool(bool internal, CPubKey& pub_key) override
     {
-        return m_wallet->GetKeyFromPool(pub_key, internal);
+        auto spk_man = m_wallet->GetLegacyScriptPubKeyMan();
+        if (!spk_man) {
+            return false;
+        }
+        return spk_man->GetKeyFromPool(pub_key, internal);
     }
-    bool getPubKey(const CKeyID& address, CPubKey& pub_key) override { return m_wallet->GetLegacyScriptPubKeyMan()->GetPubKey(address, pub_key); }
-    bool getPrivKey(const CKeyID& address, CKey& key) override { return m_wallet->GetLegacyScriptPubKeyMan()->GetKey(address, key); }
+    bool getPubKey(const CKeyID& address, CPubKey& pub_key) override {
+        auto spk_man = m_wallet->GetLegacyScriptPubKeyMan();
+        if (!spk_man) {
+            return false;
+        }
+        return spk_man->GetPubKey(address, pub_key);
+    }
+    bool getPrivKey(const CKeyID& address, CKey& key) override {
+        auto spk_man = m_wallet->GetLegacyScriptPubKeyMan();
+        if (!spk_man) {
+            return false;
+        }
+        return spk_man->GetKey(address, key);
+    }
     bool isSpendable(const CScript& script) override { return m_wallet->IsMine(script) & ISMINE_SPENDABLE; }
     bool isSpendable(const CTxDestination& dest) override { return m_wallet->IsMine(dest) & ISMINE_SPENDABLE; }
     bool haveWatchOnly() override
@@ -235,7 +251,7 @@ public:
         }
         return result;
     }
-    //void learnRelatedScripts(const CPubKey& key, OutputType type) override { m_wallet->GetLegacyScriptPubKeyMan()->LearnRelatedScripts(key, type); }
+    //void learnRelatedScripts(const CPubKey& key, OutputType type) override { if (spk_man) m_wallet->GetLegacyScriptPubKeyMan()->LearnRelatedScripts(key, type); }
     bool addDestData(const CTxDestination& dest, const std::string& key, const std::string& value) override
     {
         LOCK(m_wallet->cs_wallet);

@@ -421,7 +421,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
         } else if (strType == DBKeys::HDCHAIN) {
             CHDChain chain;
             ssValue >> chain;
-            if (!pwallet->GetLegacyScriptPubKeyMan()->SetHDChain(chain, true))
+            if (!pwallet->GetLegacyScriptPubKeyMan()->SetHDChainSingle(chain, true))
             {
                 strErr = "Error reading wallet database: SetHDChain failed";
                 return false;
@@ -447,7 +447,7 @@ ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue,
                 strErr = "Error reading wallet database: CHDPubKey corrupt";
                 return false;
             }
-            if (!pwallet->GetLecacyScriptPubKeyMan()->LoadHDPubKey(hdPubKey))
+            if (!pwallet->GetLegacyScriptPubKeyMan()->LoadHDPubKey(hdPubKey))
             {
                 strErr = "Error reading wallet database: LoadHDPubKey failed";
                 return false;
@@ -516,7 +516,8 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     DBErrors result = DBErrors::LOAD_OK;
 
     LOCK(pwallet->cs_wallet);
-    AssertLockHeld(pwallet->GetLegacyScriptPubKeyMan()->cs_wallet);
+    auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
+    AssertLockHeld(spk_man->cs_wallet);
     try {
         int nMinVersion = 0;
         if (m_batch->Read(DBKeys::MINVERSION, nMinVersion)) {
@@ -623,7 +624,7 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     // Upgrade all of the wallet keymetadata to have the hd master key id
     // This operation is not atomic, but if it fails, updated entries are still backwards compatible with older software
     try {
-        pwallet->UpgradeKeyMetadata();
+        spk_man->UpgradeKeyMetadata();
     } catch (...) {
         result = DBErrors::CORRUPT;
     }
