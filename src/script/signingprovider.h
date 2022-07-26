@@ -69,8 +69,6 @@ protected:
 
     KeyMap mapKeys GUARDED_BY(cs_KeyStore);
     ScriptMap mapScripts GUARDED_BY(cs_KeyStore);
-    /* the HD chain data model*/
-    CHDChain hdChain GUARDED_BY(cs_KeyStore);
 
 public:
     mutable CCriticalSection cs_KeyStore;
@@ -85,8 +83,6 @@ public:
     virtual bool HaveCScript(const CScriptID &hash) const override;
     virtual std::set<CScriptID> GetCScripts() const;
     virtual bool GetCScript(const CScriptID &hash, CScript& redeemScriptOut) const override;
-
-    virtual bool GetHDChain(CHDChain& hdChainRet) const;
 };
 
 #endif // BITCOIN_SCRIPT_SIGNINGPROVIDER_H

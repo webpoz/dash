@@ -161,7 +161,7 @@ private:
     WalletBatch *encrypted_batch GUARDED_BY(cs_wallet) = nullptr;
 
     /* the HD chain data model (external chain counters) */
-    CHDChain hdChain;
+    CHDChain hdChain GUARDED_BY(cs_KeyStore);
 
     /* HD derive new child key (on internal or external chain) */
     void DeriveNewChildKey(WalletBatch& batch, CKeyMetadata& metadata, CKey& secretRet, uint32_t nAccountIndex, bool fInternal /*= false*/) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
@@ -245,7 +245,7 @@ public:
     //! loads a HDPubKey into the wallets memory
     bool LoadHDPubKey(const CHDPubKey &hdPubKey) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     std::set<CKeyID> GetKeys() const override;
-    virtual bool GetHDChain(CHDChain& hdChainRet) const override;
+    virtual bool GetHDChain(CHDChain& hdChainRet) const;
     bool AddCScript(const CScript& redeemScript) override;
     bool LoadCScript(const CScript& redeemScript);
 
