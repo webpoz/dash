@@ -4896,63 +4896,6 @@ bool CWallet::Lock(bool fAllowMixing)
     return true;
 }
 
-bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly, bool accept_no_keys)
-{
-    {
-        LOCK(cs_KeyStore);
-        if (!SetCrypted())
-            return false;
-
-        bool keyPass = mapCryptedKeys.empty(); // Always pass when there are no encrypted keys
-        bool keyFail = false;
-        CryptedKeyMap::const_iterator mi = mapCryptedKeys.begin();
-        for (; mi != mapCryptedKeys.end(); ++mi)
-        {
-            const CPubKey &vchPubKey = (*mi).second.first;
-            const std::vector<unsigned char> &vchCryptedSecret = (*mi).second.second;
-            CKey key;
-            if (!DecryptKey(vMasterKeyIn, vchCryptedSecret, vchPubKey, key))
-            {
-                keyFail = true;
-                break;
-            }
-            keyPass = true;
-            if (fDecryptionThoroughlyChecked)
-                break;
-        }
-        if (keyPass && keyFail)
-        {
-            LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
-            throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
-        }
-        if (keyFail || (!keyPass && m_spk_man && m_spk_man->cryptedHDChain.IsNull() && !accept_no_keys))
-            return false;
-
-        vMasterKey = vMasterKeyIn;
-
-        if (m_spk_man)
-        {
-            if(!m_spk_man->cryptedHDChain.IsNull()) {
-                bool chainPass = false;
-                // try to decrypt seed and make sure it matches
-                CHDChain hdChainTmp;
-                if (m_spk_man->DecryptHDChain(hdChainTmp)) {
-                    // make sure seed matches this chain
-                    chainPass = m_spk_man->cryptedHDChain.GetID() == hdChainTmp.GetSeedHash();
-                }
-                if (!chainPass) {
-                    vMasterKey.clear();
-                    return false;
-                }
-            }
-        }
-        fDecryptionThoroughlyChecked = true;
-    }
-    fOnlyMixingAllowed = fForMixingOnly;
-    NotifyStatusChanged(this);
-    return true;
-}
-
 bool CWallet::Unlock(const SecureString& strWalletPassphrase, bool fForMixingOnly, bool accept_no_keys)
 {
     if (!IsLocked()) // was already fully unlocked, not only for mixing
