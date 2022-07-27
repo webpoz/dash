@@ -139,11 +139,10 @@ public:
 class LegacyScriptPubKeyMan : public ScriptPubKeyMan, public FillableSigningProvider
 {
 private:
-    CHDChain cryptedHDChain GUARDED_BY(cs_KeyStore);
-
     using CryptedKeyMap = std::map<CKeyID, std::pair<CPubKey, std::vector<unsigned char>>>;
     using WatchOnlySet = std::set<CScript>;
     using WatchKeyMap = std::map<CKeyID, CPubKey>;
+    using HDPubKeyMap = std::map<CKeyID, CHDPubKey>;
 
     //! will encrypt previously unencrypted keys
     bool EncryptKeys(CKeyingMaterial& vMasterKeyIn);
@@ -151,6 +150,7 @@ private:
     CryptedKeyMap mapCryptedKeys GUARDED_BY(cs_KeyStore);
     WatchOnlySet setWatchOnly GUARDED_BY(cs_KeyStore);
     WatchKeyMap mapWatchKeys GUARDED_BY(cs_KeyStore);
+    HDPubKeyMap mapHdPubKeys GUARDED_BY(cs_KeyStore); //<! memory map of HD extended pubkeys
 
     bool HaveKeyInner(const CKeyID &address) const;
     bool AddCryptedKeyInner(const CPubKey &vchPubKey, const std::vector<unsigned char> &vchCryptedSecret);
@@ -162,13 +162,13 @@ private:
 
     /* the HD chain data model (external chain counters) */
     CHDChain hdChain GUARDED_BY(cs_KeyStore);
+    CHDChain cryptedHDChain GUARDED_BY(cs_KeyStore);
 
     /* HD derive new child key (on internal or external chain) */
     void DeriveNewChildKey(WalletBatch& batch, CKeyMetadata& metadata, CKey& secretRet, uint32_t nAccountIndex, bool fInternal /*= false*/) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     std::set<int64_t> setInternalKeyPool GUARDED_BY(cs_wallet);
     std::set<int64_t> setExternalKeyPool GUARDED_BY(cs_wallet);
-    std::set<int64_t> set_pre_split_keypool GUARDED_BY(cs_wallet);
     int64_t m_max_keypool_index GUARDED_BY(cs_wallet) = 0;
     std::map<CKeyID, int64_t> m_pool_key_to_index;
 
@@ -203,7 +203,6 @@ public:
 
  public:
     void LoadKeyPool(int64_t nIndex, const CKeyPool &keypool) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
-    void MarkPreSplitKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     // Map from Key ID to key metadata.
     std::map<CKeyID, CKeyMetadata> mapKeyMetadata GUARDED_BY(cs_wallet);
@@ -245,7 +244,6 @@ public:
     //! loads a HDPubKey into the wallets memory
     bool LoadHDPubKey(const CHDPubKey &hdPubKey) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     std::set<CKeyID> GetKeys() const override;
-    virtual bool GetHDChain(CHDChain& hdChainRet) const;
     bool AddCScript(const CScript& redeemScript) override;
     bool LoadCScript(const CScript& redeemScript);
 
@@ -305,14 +303,12 @@ public:
      * HD Wallet Functions
      */
 
-    /* Set the HD chain model (chain child index counters) */
-    void SetHDChain(const CHDChain& chain, bool memonly);
-    const CHDChain& GetHDChain() const { return hdChain; }
-
     bool EncryptHDChain(const CKeyingMaterial& vMasterKeyIn, const CHDChain& chain = CHDChain());
     bool DecryptHDChain(CHDChain& hdChainRet) const;
     bool SetHDChain(const CHDChain& chain);
+    bool GetHDChain(CHDChain& hdChainRet) const;
     bool SetCryptedHDChain(const CHDChain& chain);
+    bool GetDecryptedHDChain(CHDChain& hdChainRet);
 
     /* Returns true if HD is enabled */
     bool IsHDEnabled() const;
@@ -337,29 +333,25 @@ public:
     bool SetHDChainSingle(const CHDChain& chain, bool memonly);
     bool SetCryptedHDChainSingle(const CHDChain& chain, bool memonly);
 
-    bool GetDecryptedHDChain(CHDChain& hdChainRet);
-
     /**
      * Explicitly make the wallet learn the related scripts for outputs to the
      * given key. This is purely to make the wallet file compatible with older
      * software, as FillableSigningProvider automatically does this implicitly for all
      * keys now.
      */
-    void LearnRelatedScripts(const CPubKey& key, OutputType);
+    // void LearnRelatedScripts(const CPubKey& key, OutputType);
 
     /**
      * Same as LearnRelatedScripts, but when the OutputType is not known (and could
      * be anything).
      */
-    void LearnAllRelatedScripts(const CPubKey& key);
+    // void LearnAllRelatedScripts(const CPubKey& key);
 
     /** Implement lookup of key origin information through wallet key metadata. */
     bool GetKeyOrigin(const CKeyID& keyid, KeyOriginInfo& info) const override;
 
     /** Add a KeyOriginInfo to the wallet */
     bool AddKeyOrigin(const CPubKey& pubkey, const KeyOriginInfo& info);
-
-    std::map<CKeyID, CHDPubKey> mapHdPubKeys; //<! memory map of HD extended pubkeys
 
     // Temporary CWallet accessors and aliases.
     friend class CWallet;

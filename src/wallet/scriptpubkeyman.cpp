@@ -186,13 +186,24 @@ bool CWallet::Unlock(const CKeyingMaterial& vMasterKeyIn, bool fForMixingOnly, b
             LogPrintf("The wallet is probably corrupted: Some keys decrypt but not all.\n");
             throw std::runtime_error("Error unlocking wallet: some keys decrypt but not all. Your wallet file may be corrupt.");
         }
-        if (keyFail || (!keyPass && m_spk_man && m_spk_man->cryptedHDChain.IsNull() && !accept_no_keys))
+        if (keyFail) {
             return false;
+        }
+        if (!keyPass && !accept_no_keys) {
+            if (m_spk_man == nullptr) {
+                return false;
+            } else {
+                AssertLockHeld(m_spk_man->cs_KeyStore);
+                if (m_spk_man->cryptedHDChain.IsNull()) {
+                    return false;
+                }
+            }
+        }
 
         vMasterKey = vMasterKeyIn;
 
-        if (m_spk_man)
-        {
+        if (m_spk_man != nullptr) {
+            AssertLockHeld(m_spk_man->cs_KeyStore);
             if(!m_spk_man->cryptedHDChain.IsNull()) {
                 bool chainPass = false;
                 // try to decrypt seed and make sure it matches
@@ -254,13 +265,14 @@ void LegacyScriptPubKeyMan::UpgradeKeyMetadata()
     masterKey.SetSeed(vchSeed.data(), vchSeed.size());
     CKeyID master_id = masterKey.key.GetPubKey().GetID();
 
+    LOCK(cs_KeyStore);
     std::unique_ptr<WalletBatch> batch = MakeUnique<WalletBatch>(m_storage.GetDatabase());
     size_t cnt = 0;
     for (auto& meta_pair : mapKeyMetadata) {
         const CKeyID& keyid = meta_pair.first;
         CKeyMetadata& meta = meta_pair.second;
         if (!meta.has_key_origin) {
-            std::map<CKeyID, CHDPubKey>::const_iterator mi = mapHdPubKeys.find(keyid);
+            HDPubKeyMap::const_iterator mi = mapHdPubKeys.find(keyid);
             if (mi == mapHdPubKeys.end()) {
                 continue;
             }
@@ -953,7 +965,7 @@ bool LegacyScriptPubKeyMan::SetCryptedHDChain(const CHDChain& chain)
 
 bool LegacyScriptPubKeyMan::HaveKey(const CKeyID &address) const
 {
-    LOCK(cs_wallet);
+    LOCK(cs_KeyStore);
     if (mapHdPubKeys.count(address) > 0)
         return true;
     return HaveKeyInner(address);
@@ -970,7 +982,7 @@ bool LegacyScriptPubKeyMan::AddHDPubKey(WalletBatch &batch, const CExtPubKey &ex
     hdPubKey.extPubKey = extPubKey;
     hdPubKey.hdchainID = hdChainCurrent.GetID();
     hdPubKey.nChangeIndex = fInternal ? 1 : 0;
-    mapHdPubKeys[extPubKey.pubkey.GetID()] = hdPubKey;
+    LoadHDPubKey(hdPubKey);
 
     // check if we need to remove from watch-only
     CScript script;
@@ -990,16 +1002,15 @@ bool LegacyScriptPubKeyMan::AddHDPubKey(WalletBatch &batch, const CExtPubKey &ex
 
 bool LegacyScriptPubKeyMan::LoadHDPubKey(const CHDPubKey &hdPubKey)
 {
-    AssertLockHeld(cs_wallet);
-
+    LOCK(cs_KeyStore);
     mapHdPubKeys[hdPubKey.extPubKey.pubkey.GetID()] = hdPubKey;
     return true;
 }
 
 bool LegacyScriptPubKeyMan::GetKey(const CKeyID &address, CKey& keyOut) const
 {
-    LOCK(cs_wallet);
-    std::map<CKeyID, CHDPubKey>::const_iterator mi = mapHdPubKeys.find(address);
+    LOCK(cs_KeyStore);
+    HDPubKeyMap::const_iterator mi = mapHdPubKeys.find(address);
     if (mi != mapHdPubKeys.end())
     {
         // if the key has been found in mapHdPubKeys, derive it on the fly
@@ -1054,8 +1065,8 @@ bool LegacyScriptPubKeyMan::AddKeyOrigin(const CPubKey& pubkey, const KeyOriginI
 
 bool LegacyScriptPubKeyMan::GetPubKey(const CKeyID &address, CPubKey& vchPubKeyOut) const
 {
-    LOCK(cs_wallet);
-    std::map<CKeyID, CHDPubKey>::const_iterator mi = mapHdPubKeys.find(address);
+    LOCK(cs_KeyStore);
+    HDPubKeyMap::const_iterator mi = mapHdPubKeys.find(address);
     if (mi != mapHdPubKeys.end())
     {
         const CHDPubKey &hdPubKey = (*mi).second;

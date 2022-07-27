@@ -119,6 +119,7 @@ void TestGUI(interfaces::Node& node)
         AssertLockHeld(spk_man->cs_wallet);
         wallet->SetAddressBook(test.coinbaseKey.GetPubKey().GetID(), "", "receive");
         spk_man->AddKeyPubKey(test.coinbaseKey, test.coinbaseKey.GetPubKey());
+        wallet->SetLastBlockProcessed(105, ::ChainActive().Tip()->GetBlockHash());
     }
     {
         WalletRescanReserver reserver(wallet.get());

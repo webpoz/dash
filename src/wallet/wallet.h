@@ -1278,13 +1278,13 @@ public:
     LegacyScriptPubKeyMan::CryptedKeyMap& mapCryptedKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapCryptedKeys;
     LegacyScriptPubKeyMan::WatchOnlySet& setWatchOnly GUARDED_BY(cs_KeyStore) = m_spk_man->setWatchOnly;
     LegacyScriptPubKeyMan::WatchKeyMap& mapWatchKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapWatchKeys;
+    LegacyScriptPubKeyMan::HDPubKeyMap& mapHdPubKeys GUARDED_BY(cs_KeyStore) = m_spk_man->mapHdPubKeys;
     WalletBatch*& encrypted_batch GUARDED_BY(cs_wallet) = m_spk_man->encrypted_batch;
     std::set<int64_t>& setInternalKeyPool GUARDED_BY(cs_wallet) = m_spk_man->setInternalKeyPool;
     std::set<int64_t>& setExternalKeyPool GUARDED_BY(cs_wallet) = m_spk_man->setExternalKeyPool;
     int64_t& nTimeFirstKey GUARDED_BY(cs_wallet) = m_spk_man->nTimeFirstKey;
     std::map<CKeyID, CKeyMetadata>& mapKeyMetadata GUARDED_BY(cs_wallet) = m_spk_man->mapKeyMetadata;
     std::map<CScriptID, CKeyMetadata>& m_script_metadata GUARDED_BY(cs_wallet) = m_spk_man->m_script_metadata;
-    void MarkPreSplitKeys() EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(m_spk_man->cs_wallet); m_spk_man->MarkPreSplitKeys(); }
     void MarkReserveKeysAsUsed(int64_t keypool_id) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet) { AssertLockHeld(m_spk_man->cs_wallet); m_spk_man->MarkReserveKeysAsUsed(keypool_id); }
     using CryptedKeyMap = LegacyScriptPubKeyMan::CryptedKeyMap;
 };

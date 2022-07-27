@@ -977,6 +977,7 @@ bool CWallet::AddToWalletIfInvolvingMe(const CTransactionRef& ptx, CWalletTx::Co
             for (const CTxOut& txout: tx.vout) {
                 // extract addresses, check if they match with an unused keypool key, update metadata if needed
                 if (m_spk_man == nullptr) continue;
+                AssertLockHeld(m_spk_man->cs_wallet);
                 for (const auto& keyid : GetAffectedKeys(txout.scriptPubKey, *m_spk_man)) {
                     std::map<CKeyID, int64_t>::const_iterator mi = m_spk_man->m_pool_key_to_index.find(keyid);
                     if (mi != m_spk_man->m_pool_key_to_index.end()) {
@@ -3591,7 +3592,7 @@ DBErrors CWallet::LoadWallet(bool& fFirstRunRet)
     {
         LOCK(cs_KeyStore);
         // This wallet is in its first run if all of these are empty
-        fFirstRunRet = mapKeys.empty() && (!m_spk_man || m_spk_man->mapHdPubKeys.empty()) && mapCryptedKeys.empty() && mapWatchKeys.empty() && setWatchOnly.empty() && mapScripts.empty() && !IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) && !IsWalletFlagSet(WALLET_FLAG_BLANK_WALLET);
+        fFirstRunRet = mapKeys.empty() && mapHdPubKeys.empty() && mapCryptedKeys.empty() && mapWatchKeys.empty() && setWatchOnly.empty() && mapScripts.empty() && !IsWalletFlagSet(WALLET_FLAG_DISABLE_PRIVATE_KEYS) && !IsWalletFlagSet(WALLET_FLAG_BLANK_WALLET);
     }
 
     if (HaveChain()) {

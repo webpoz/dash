@@ -499,6 +499,7 @@ bool ReadKeyValue(CWallet* pwallet, CDataStream& ssKey, CDataStream& ssValue, st
 {
     CWalletScanState dummy_wss;
     LOCK(pwallet->cs_wallet);
+    AssertLockHeld(pwallet->GetLegacyScriptPubKeyMan()->cs_wallet);
     return ReadKeyValue(pwallet, ssKey, ssValue, dummy_wss, strType, strErr, filter_fn);
 }
 
@@ -516,8 +517,7 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     DBErrors result = DBErrors::LOAD_OK;
 
     LOCK(pwallet->cs_wallet);
-    auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
-    AssertLockHeld(spk_man->cs_wallet);
+    AssertLockHeld(pwallet->GetLegacyScriptPubKeyMan()->cs_wallet);
     try {
         int nMinVersion = 0;
         if (m_batch->Read(DBKeys::MINVERSION, nMinVersion)) {
@@ -604,6 +604,7 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     if ((wss.nKeys + wss.nCKeys + wss.nWatchKeys + wss.nHDPubKeys) != wss.nKeyMeta) {
         auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
         if (spk_man) {
+            AssertLockHeld(spk_man->cs_wallet);
             spk_man->UpdateTimeFirstKey(1);
         }
     }
@@ -624,7 +625,11 @@ DBErrors WalletBatch::LoadWallet(CWallet* pwallet)
     // Upgrade all of the wallet keymetadata to have the hd master key id
     // This operation is not atomic, but if it fails, updated entries are still backwards compatible with older software
     try {
-        spk_man->UpgradeKeyMetadata();
+        auto spk_man = pwallet->GetLegacyScriptPubKeyMan();
+        if (spk_man) {
+            AssertLockHeld(spk_man->cs_wallet);
+            spk_man->UpgradeKeyMetadata();
+        }
     } catch (...) {
         result = DBErrors::CORRUPT;
     }

@@ -113,6 +113,7 @@ UniValue importprivkey(const JSONRPCRequest& request)
     bool fRescan = true;
     {
         LOCK(pwallet->cs_wallet);
+        AssertLockHeld(spk_man->cs_wallet);
 
         EnsureWalletIsUnlocked(pwallet);
 
@@ -209,6 +210,8 @@ static void ImportScript(CWallet * const pwallet, const CScript& script, const s
     if (!spk_man) {
         throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
     }
+
+    AssertLockHeld(spk_man->cs_wallet);
 
     if (!spk_man->HaveWatchOnly(script) && !spk_man->AddWatchOnlyWithDB(batch, script, 0 /* nCreateTime */)) {
         throw JSONRPCError(RPC_WALLET_ERROR, "Error adding address to wallet");
@@ -596,57 +599,60 @@ UniValue importwallet(const JSONRPCRequest& request)
         double total = (double)(keys.size() + scripts.size());
         double progress = 0;
         LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
-        if (total > 0 && !spk_man) {
-            throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
-        }
+        if (spk_man == nullptr) {
+            if (total > 0) {
+                throw JSONRPCError(RPC_WALLET_ERROR, "This type of wallet does not support this command");
+            }
+        } else {
+            AssertLockHeld(spk_man->cs_wallet);
+            for (const auto& key_tuple : keys) {
+                pwallet->chain().showProgress("", std::max(50, std::min(75, (int)((progress / total) * 100) + 50)), false);
+                const CKey& key = std::get<0>(key_tuple);
+                int64_t time = std::get<1>(key_tuple);
+                bool has_label = std::get<2>(key_tuple);
+                std::string label = std::get<3>(key_tuple);
 
-        for (const auto& key_tuple : keys) {
-            pwallet->chain().showProgress("", std::max(50, std::min(75, (int)((progress / total) * 100) + 50)), false);
-            const CKey& key = std::get<0>(key_tuple);
-            int64_t time = std::get<1>(key_tuple);
-            bool has_label = std::get<2>(key_tuple);
-            std::string label = std::get<3>(key_tuple);
-
-            CPubKey pubkey = key.GetPubKey();
-            CHECK_NONFATAL(key.VerifyPubKey(pubkey));
-            CKeyID keyid = pubkey.GetID();
-            if (spk_man->HaveKey(keyid)) {
-                pwallet->WalletLogPrintf("Skipping import of %s (key already present)\n", EncodeDestination(keyid));
-                continue;
-            }
-            pwallet->WalletLogPrintf("Importing %s...\n", EncodeDestination(keyid));
-            if (!spk_man->AddKeyPubKeyWithDB(batch, key, pubkey)) {
-                fGood = false;
-                continue;
-            }
-            spk_man->mapKeyMetadata[keyid].nCreateTime = time;
-            if (has_label)
-                pwallet->SetAddressBook(keyid, label, "receive");
-            nTimeBegin = std::min(nTimeBegin, time);
-            progress++;
-        }
-        for (const auto& script_pair : scripts) {
-            pwallet->chain().showProgress("", std::max(50, std::min(75, (int)((progress / total) * 100) + 50)), false);
-            const CScript& script = script_pair.first;
-            int64_t time = script_pair.second;
-            CScriptID id(script);
-            if (spk_man->HaveCScript(id)) {
-                pwallet->WalletLogPrintf("Skipping import of %s (script already present)\n", HexStr(script));
-                continue;
-            }
-            if(!spk_man->AddCScriptWithDB(batch, script)) {
-                pwallet->WalletLogPrintf("Error importing script %s\n", HexStr(script));
-                fGood = false;
-                continue;
-            }
-            if (time > 0) {
-                spk_man->m_script_metadata[id].nCreateTime = time;
+                CPubKey pubkey = key.GetPubKey();
+                CHECK_NONFATAL(key.VerifyPubKey(pubkey));
+                CKeyID keyid = pubkey.GetID();
+                if (spk_man->HaveKey(keyid)) {
+                    pwallet->WalletLogPrintf("Skipping import of %s (key already present)\n", EncodeDestination(keyid));
+                    continue;
+                }
+                pwallet->WalletLogPrintf("Importing %s...\n", EncodeDestination(keyid));
+                if (!spk_man->AddKeyPubKeyWithDB(batch, key, pubkey)) {
+                    fGood = false;
+                    continue;
+                }
+                spk_man->mapKeyMetadata[keyid].nCreateTime = time;
+                if (has_label)
+                    pwallet->SetAddressBook(keyid, label, "receive");
                 nTimeBegin = std::min(nTimeBegin, time);
+                progress++;
             }
-            progress++;
+            for (const auto& script_pair : scripts) {
+                pwallet->chain().showProgress("", std::max(50, std::min(75, (int)((progress / total) * 100) + 50)), false);
+                const CScript& script = script_pair.first;
+                int64_t time = script_pair.second;
+                CScriptID id(script);
+                if (spk_man->HaveCScript(id)) {
+                    pwallet->WalletLogPrintf("Skipping import of %s (script already present)\n", HexStr(script));
+                    continue;
+                }
+                if(!spk_man->AddCScriptWithDB(batch, script)) {
+                    pwallet->WalletLogPrintf("Error importing script %s\n", HexStr(script));
+                    fGood = false;
+                    continue;
+                }
+                if (time > 0) {
+                    spk_man->m_script_metadata[id].nCreateTime = time;
+                    nTimeBegin = std::min(nTimeBegin, time);
+                }
+                progress++;
+            }
+            pwallet->chain().showProgress("", 100, false); // hide progress dialog in GUI
+            spk_man->UpdateTimeFirstKey(nTimeBegin);
         }
-        pwallet->chain().showProgress("", 100, false); // hide progress dialog in GUI
-        if (spk_man) spk_man->UpdateTimeFirstKey(nTimeBegin);
     }
     pwallet->chain().showProgress("", 100, false); // hide progress dialog in GUI
     RescanWallet(*pwallet, reserver, nTimeBegin, false /* update */);
@@ -694,6 +700,7 @@ UniValue importelectrumwallet(const JSONRPCRequest& request)
     }
 
     LOCK(pwallet->cs_wallet);
+    AssertLockHeld(spk_man->cs_wallet);
 
     EnsureWalletIsUnlocked(pwallet);
 

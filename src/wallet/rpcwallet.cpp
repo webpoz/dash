@@ -2451,6 +2451,7 @@ static UniValue getwalletinfo(const JSONRPCRequest& request)
     obj.pushKV("immature_balance", ValueFromAmount(bal.m_mine_immature));
     obj.pushKV("txcount",       (int)pwallet->mapWallet.size());
     if (spk_man) {
+        AssertLockHeld(spk_man->cs_wallet);
         obj.pushKV("timefirstkey", spk_man->GetTimeFirstKey());
         obj.pushKV("keypoololdest", spk_man->GetOldestKeyPoolTime());
         obj.pushKV("keypoolsize",   (int64_t)spk_man->KeypoolCountExternalKeys());
@@ -3629,8 +3630,12 @@ UniValue getaddressinfo(const JSONRPCRequest& request)
         ret.pushKV("timestamp", meta->nCreateTime);
         CHDChain hdChainCurrent;
         LegacyScriptPubKeyMan* spk_man = pwallet->GetLegacyScriptPubKeyMan();
-        if (key_id && spk_man && spk_man->mapHdPubKeys.count(*key_id) && spk_man->GetHDChain(hdChainCurrent)) {
-            ret.pushKV("hdchainid", hdChainCurrent.GetID().GetHex());
+        if (spk_man != nullptr) {
+            LOCK(pwallet->cs_KeyStore);
+            AssertLockHeld(spk_man->cs_KeyStore);
+            if (key_id && pwallet->mapHdPubKeys.count(*key_id) && spk_man->GetHDChain(hdChainCurrent)) {
+                ret.pushKV("hdchainid", hdChainCurrent.GetID().GetHex());
+            }
         }
         if (meta->has_key_origin) {
             ret.pushKV("hdkeypath", WriteHDKeypath(meta->key_origin.path));
