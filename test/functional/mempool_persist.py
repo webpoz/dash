@@ -57,12 +57,12 @@ class MempoolPersistTest(BitcoinTestFramework):
 
     def run_test(self):
         self.log.debug("Send 5 transactions from node2 (to its own address)")
-        tx_creation_time_lower = int(time.time())
+        tx_creation_time_lower = self.mocktime
         for i in range(5):
             last_txid = self.nodes[2].sendtoaddress(self.nodes[2].getnewaddress(), Decimal("10"))
         node2_balance = self.nodes[2].getbalance()
         self.sync_all()
-        tx_creation_time_higher = int(time.time())
+        tx_creation_time_higher = self.mocktime
 
         self.log.debug("Verify that node0 and node1 have 5 transactions in their mempools")
         assert_equal(len(self.nodes[0].getrawmempool()), 5)
