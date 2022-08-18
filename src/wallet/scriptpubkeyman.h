@@ -206,9 +206,9 @@ private:
      * nTimeFirstKey more intelligently for more efficient rescans.
      */
     bool AddWatchOnly(const CScript& dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
+    bool AddWatchOnlyWithDB(WalletBatch &batch, const CScript& dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     bool AddWatchOnlyInMem(const CScript &dest);
 
-    bool AddWatchOnlyWithDB(WalletBatch &batch, const CScript& dest) EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
     void AddKeypoolPubkeyWithDB(const CPubKey& pubkey, const bool internal, WalletBatch& batch);
 
@@ -227,6 +227,8 @@ private:
     int64_t m_max_keypool_index GUARDED_BY(cs_wallet) = 0;
     std::map<CKeyID, int64_t> m_pool_key_to_index;
 
+    //! Fetches a key from the keypool
+    bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
     /**
      * Reserves a key from the keypool and sets nIndex to its index
      *
@@ -276,8 +278,6 @@ public:
     size_t KeypoolCountExternalKeys() override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
     size_t KeypoolCountInternalKeys() override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
 
-    //! Fetches a key from the keypool
-    bool GetKeyFromPool(CPubKey &key, bool fInternal /*= false*/);
     unsigned int GetKeyPoolSize() const override;
 
     int64_t GetTimeFirstKey() const override EXCLUSIVE_LOCKS_REQUIRED(cs_wallet);
