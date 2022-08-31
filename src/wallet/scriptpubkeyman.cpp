@@ -472,7 +472,7 @@ bool LegacyScriptPubKeyMan::SetHDChain(WalletBatch &batch, const CHDChain& chain
             throw std::runtime_error(std::string(__func__) + ": WriteHDChain failed");
         }
 
-        m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
+        m_storage.UnsetBlankWalletFlag(batch);
     }
 
     return true;
@@ -493,7 +493,7 @@ bool LegacyScriptPubKeyMan::SetCryptedHDChain(WalletBatch &batch, const CHDChain
             if (!batch.WriteCryptedHDChain(chain))
                 throw std::runtime_error(std::string(__func__) + ": WriteCryptedHDChain failed");
         }
-        m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
+        m_storage.UnsetBlankWalletFlag(batch);
     }
 
     return true;
@@ -1114,7 +1114,7 @@ bool LegacyScriptPubKeyMan::AddHDPubKey(WalletBatch &batch, const CExtPubKey &ex
     if (!batch.WriteHDPubKey(hdPubKey, mapKeyMetadata[extPubKey.pubkey.GetID()])) {
         return false;
     }
-    m_wallet.UnsetWalletFlagWithDB(batch, WALLET_FLAG_BLANK_WALLET);
+    m_storage.UnsetBlankWalletFlag(batch);
     return true;
 }
 
