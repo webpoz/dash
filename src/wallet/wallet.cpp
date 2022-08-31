@@ -4533,7 +4533,7 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
         if (gArgs.GetArg("-rescan", 0) != 2) {
             Optional<int64_t> time_first_key;
             if (auto spk_man = walletInstance->m_spk_man.get()) {
-                LOCK(walletInstance->cs_wallet);
+                LOCK(spk_man->cs_wallet);
                 int64_t time = spk_man->GetTimeFirstKey();
                 if (!time_first_key || time < *time_first_key) time_first_key = time;
             }
@@ -4568,9 +4568,9 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain& chain,
         walletInstance->WalletLogPrintf("setInternalKeyPool.size() = %u\n",   walletInstance->KeypoolCountInternalKeys());
         walletInstance->WalletLogPrintf("mapWallet.size() = %u\n",            walletInstance->mapWallet.size());
         walletInstance->WalletLogPrintf("mapAddressBook.size() = %u\n",       walletInstance->mapAddressBook.size());
-        {
-            LOCK(walletInstance->cs_wallet);
-            walletInstance->WalletLogPrintf("nTimeFirstKey = %u\n",               walletInstance->m_spk_man->GetTimeFirstKey());
+        if (auto spk_man = walletInstance->m_spk_man.get()) {
+            LOCK(spk_man->cs_wallet);
+            walletInstance->WalletLogPrintf("nTimeFirstKey = %u\n", spk_man->GetTimeFirstKey());
         }
     }
 
