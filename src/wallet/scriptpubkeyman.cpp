@@ -684,8 +684,9 @@ void LegacyScriptPubKeyMan::RewriteDB()
     // that requires a new key.
 }
 
-static int64_t GetOldestKeyInPool(const std::set<int64_t>& setKeyPool, WalletBatch& batch) {
+static int64_t GetOldestKeyTimeInPool(const std::set<int64_t>& setKeyPool, WalletBatch& batch) {
     if (setKeyPool.empty()) {
+        // if the keypool is empty, return <NOW>
         return GetTime();
     }
 
@@ -702,19 +703,11 @@ int64_t LegacyScriptPubKeyMan::GetOldestKeyPoolTime()
 {
     LOCK(cs_wallet);
 
-    // if the keypool is empty, return <NOW>
-    if (setExternalKeyPool.empty() && setInternalKeyPool.empty())
-        return GetTime();
-
     WalletBatch batch(m_storage.GetDatabase());
-    int64_t oldestKey = -1;
+    int64_t oldestKey = GetOldestKeyTimeInPool(setExternalKeyPool, batch);
 
-    // load oldest key from keypool, get time and return
-    if (!setInternalKeyPool.empty()) {
-        oldestKey = std::max(GetOldestKeyInPool(setInternalKeyPool, batch), oldestKey);
-    }
-    if (!setExternalKeyPool.empty()) {
-        oldestKey = std::max(GetOldestKeyInPool(setExternalKeyPool, batch), oldestKey);
+    if (IsHDEnabled()) {
+        oldestKey = std::max(GetOldestKeyTimeInPool(setInternalKeyPool, batch), oldestKey);
     }
     return oldestKey;
 }
