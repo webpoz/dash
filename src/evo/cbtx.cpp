@@ -7,6 +7,7 @@
 #include <llmq/blockprocessor.h>
 #include <llmq/commitment.h>
 #include <llmq/utils.h>
+#include <evo/assetlocktx.h>
 #include <evo/simplifiedmns.h>
 #include <evo/specialtx.h>
 #include <consensus/validation.h>
@@ -14,6 +15,7 @@
 #include <chain.h>
 #include <chainparams.h>
 #include <consensus/merkle.h>
+#include <validation.h>
 
 bool CheckCbTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValidationState& state)
 {
@@ -41,6 +43,10 @@ bool CheckCbTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValidatio
     if (pindexPrev) {
         bool fDIP0008Active = pindexPrev->nHeight >= Params().GetConsensus().DIP0008Height;
         if (fDIP0008Active && cbTx.nVersion < 2) {
+            return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-cbtx-version");
+        }
+        bool fDIP0027AssetLocksActive = llmq::utils::IsDIP0027AssetLocksActive(::ChainActive().Tip());
+        if (fDIP0027AssetLocksActive && cbTx.nVersion < 3) {
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-cbtx-version");
         }
     }
@@ -308,6 +314,7 @@ bool CalcCbTxMerkleRootQuorums(const CBlock& block, const CBlockIndex* pindexPre
 
 std::string CCbTx::ToString() const
 {
-    return strprintf("CCbTx(nVersion=%d, nHeight=%d, merkleRootMNList=%s, merkleRootQuorums=%s)",
-        nVersion, nHeight, merkleRootMNList.ToString(), merkleRootQuorums.ToString());
+    return strprintf("CCbTx(nVersion=%d, nHeight=%d, merkleRootMNList=%s, merkleRootQuorums=%s, assetLockedAmount=%d.%08d)",
+        nVersion, nHeight, merkleRootMNList.ToString(), merkleRootQuorums.ToString(),
+        assetLockedAmount / COIN, assetLockedAmount % COIN);
 }

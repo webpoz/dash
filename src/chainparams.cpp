@@ -250,6 +250,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdMin = 2420;   // 60% of 4032
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nFalloffCoeff = 5;      // this corresponds to 10 periods
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].bit = 8;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nStartTime = 999999999999ULL; // TODO ENABLE BEFORE FINAL RELEASE
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nTimeout = 999999999999ULL;   // TODO ENABLE BEFORE FINAL RELEASE
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nWindowSize = 4032;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdStart = 3226; // 80% of 4032
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdMin = 2420;   // 60% of 4032
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nFalloffCoeff = 5;      // this corresponds to 10 periods
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x0000000000000000000000000000000000000000000076f91fbc02922ce2226e"); // 1718500
 
@@ -309,6 +317,8 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_400_85;
+        // TODO or which one?
+        consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_400_85;
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = true;
@@ -475,6 +485,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdMin = 60;   // 60% of 100
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nFalloffCoeff = 5;      // this corresponds to 10 periods
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].bit = 8;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nStartTime = 999999999999ULL; // TODO ENABLE BEFORE INITIAL RC
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nTimeout = 999999999999ULL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nWindowSize = 100;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdStart = 80; // 80% of 100
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdMin = 60;   // 60% of 60
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nFalloffCoeff = 5;      // this corresponds to 10 periods
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000027babbb45da9fa4"); // 771500
 
@@ -527,6 +545,8 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_50_60;
+        // TODO or which one?
+        consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_50_60;
 
         fDefaultConsistencyChecks = false;
         fRequireStandard = false;
@@ -671,6 +691,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdMin = 60;   // 60% of 100
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nFalloffCoeff = 5;    // this corresponds to 10 periods
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].bit = 8;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nStartTime = 999999999999ULL; // TODO ENABLE
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nTimeout = 999999999999ULL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nWindowSize = 100;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdStart = 80; // 80% of 100
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdMin = 60;   // 60% of 60
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nFalloffCoeff = 5;      // this corresponds to 10 periods
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x000000000000000000000000000000000000000000000000000000000000000");
 
@@ -726,6 +754,8 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_50_60;
+        // TODO or which one?
+        consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_50_60;
 
         UpdateDevnetLLMQChainLocksFromArgs(args);
         UpdateDevnetLLMQInstantSendFromArgs(args);
@@ -912,6 +942,14 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nThresholdMin = 180;   // 60% of 300
         consensus.vDeployments[Consensus::DEPLOYMENT_DIP0024].nFalloffCoeff = 5;     // this corresponds to 10 periods
 
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].bit = 8;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nTimeout = 999999999999ULL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nWindowSize = 100;
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdStart = 80; // 80% of 100
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nThresholdMin = 60;   // 60% of 100
+        consensus.vDeployments[Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS].nFalloffCoeff = 5;    // this corresponds to 10 periods
+
         // The best chain should have at least this much work.
         consensus.nMinimumChainWork = uint256S("0x00");
 
@@ -995,6 +1033,7 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_TEST_DIP0024;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_TEST;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_TEST;
+        consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_TEST;
 
         UpdateLLMQTestParametersFromArgs(args, Consensus::LLMQType::LLMQ_TEST);
         UpdateLLMQTestParametersFromArgs(args, Consensus::LLMQType::LLMQ_TEST_INSTANTSEND);

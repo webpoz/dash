@@ -820,8 +820,8 @@ class DashTestFramework(BitcoinTestFramework):
                 self.sync_blocks()
         self.sync_blocks()
 
-    def activate_dip0024(self, slow_mode=False, expected_activation_height=None):
-        self.log.info("Wait for dip0024 activation")
+    def activate_dip_by_name(self, name, slow_mode=False, expected_activation_height=None):
+        self.log.info("Wait for " + name + " activation")
 
         if expected_activation_height is not None:
             height = self.nodes[0].getblockcount()
@@ -833,13 +833,19 @@ class DashTestFramework(BitcoinTestFramework):
             assert height - expected_activation_height < batch_size
             self.nodes[0].generate(height - expected_activation_height - 1)
             self.sync_blocks()
-            assert self.nodes[0].getblockchaininfo()['bip9_softforks']['dip0024']['status'] != 'active'
+            assert self.nodes[0].getblockchaininfo()['bip9_softforks'][name]['status'] != 'active'
 
-        while self.nodes[0].getblockchaininfo()['bip9_softforks']['dip0024']['status'] != 'active':
+        while self.nodes[0].getblockchaininfo()['bip9_softforks'][name]['status'] != 'active':
             self.nodes[0].generate(10)
             if slow_mode:
                 self.sync_blocks()
         self.sync_blocks()
+
+    def activate_dip0024(self, slow_mode=False, expected_activation_height=None):
+        self.activate_dip_by_name('dip0024', slow_mode, expected_activation_height)
+
+    def activate_dip0027_assetlocks(self, slow_mode=False, expected_activation_height=None):
+        self.activate_dip_by_name('dip0027-asset-locks', slow_mode, expected_activation_height)
 
     def set_dash_llmq_test_params(self, llmq_size, llmq_threshold):
         self.llmq_size = llmq_size
