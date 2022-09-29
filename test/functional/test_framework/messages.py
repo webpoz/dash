@@ -1034,9 +1034,9 @@ class CMerkleBlock:
 
 
 class CCbTx:
-    __slots__ = ("version", "height", "merkleRootMNList", "merkleRootQuorums")
+    __slots__ = ("version", "height", "merkleRootMNList", "merkleRootQuorums", "lockedAmount")
 
-    def __init__(self, version=None, height=None, merkleRootMNList=None, merkleRootQuorums=None):
+    def __init__(self, version=None, height=None, merkleRootMNList=None, merkleRootQuorums=None, lockedAmount=None):
         self.set_null()
         if version is not None:
             self.version = version
@@ -1046,11 +1046,14 @@ class CCbTx:
             self.merkleRootMNList = merkleRootMNList
         if merkleRootQuorums is not None:
             self.merkleRootQuorums = merkleRootQuorums
+        if lockedAmount is not None:
+            self.lockedAmount = lockedAmount
 
     def set_null(self):
         self.version = 0
         self.height = 0
         self.merkleRootMNList = None
+        self.lockedAmount = 0
 
     def deserialize(self, f):
         self.version = struct.unpack("<H", f.read(2))[0]
@@ -1058,6 +1061,8 @@ class CCbTx:
         self.merkleRootMNList = deser_uint256(f)
         if self.version >= 2:
             self.merkleRootQuorums = deser_uint256(f)
+        if self.version >= 3:
+            self.lockedAmount = struct.unpack("<q", f.read(8))[0]
 
     def serialize(self):
         r = b""
@@ -1066,6 +1071,8 @@ class CCbTx:
         r += ser_uint256(self.merkleRootMNList)
         if self.version >= 2:
             r += ser_uint256(self.merkleRootQuorums)
+        if self.version >= 3:
+            r += struct.pack("<q", self.lockedAmount)
         return r
 
 
