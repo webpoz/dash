@@ -10,6 +10,7 @@
 #include <evo/deterministicmns.h>
 #include <evo/mnhftx.h>
 #include <evo/providertx.h>
+#include <evo/assetlocktx.h>
 #include <hash.h>
 #include <llmq/blockprocessor.h>
 #include <llmq/commitment.h>
@@ -43,6 +44,15 @@ bool CheckSpecialTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVali
             return llmq::CheckLLMQCommitment(tx, pindexPrev, state);
         case TRANSACTION_MNHF_SIGNAL:
             return VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE && CheckMNHFTx(tx, pindexPrev, state);
+        case TRANSACTION_ASSET_LOCK:
+        case TRANSACTION_ASSET_UNLOCK:
+            if (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_V19) != ThresholdState::ACTIVE) {
+                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "v19-not-active");
+            }
+            if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev); maybeError.did_err) {
+                return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
+            }
+            return true;
         }
     } catch (const std::exception& e) {
         LogPrintf("%s -- failed: %s\n", __func__, e.what());
@@ -59,6 +69,9 @@ bool ProcessSpecialTx(const CTransaction& tx, const CBlockIndex* pindex, CValida
     }
 
     switch (tx.nType) {
+    case TRANSACTION_ASSET_LOCK:
+    case TRANSACTION_ASSET_UNLOCK:
+        return true; // handled per block (during cb)
     case TRANSACTION_PROVIDER_REGISTER:
     case TRANSACTION_PROVIDER_UPDATE_SERVICE:
     case TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
@@ -82,6 +95,9 @@ bool UndoSpecialTx(const CTransaction& tx, const CBlockIndex* pindex)
     }
 
     switch (tx.nType) {
+    case TRANSACTION_ASSET_LOCK:
+    case TRANSACTION_ASSET_UNLOCK:
+        return true; // handled per block (during cb)
     case TRANSACTION_PROVIDER_REGISTER:
     case TRANSACTION_PROVIDER_UPDATE_SERVICE:
     case TRANSACTION_PROVIDER_UPDATE_REGISTRAR:
