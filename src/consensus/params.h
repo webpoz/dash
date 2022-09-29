@@ -23,6 +23,7 @@ enum DeploymentPos {
     DEPLOYMENT_REALLOC, // Deployment of Block Reward Reallocation
     DEPLOYMENT_DIP0020, // Deployment of DIP0020, DIP0021 and LMQ_100_67 quorums
     DEPLOYMENT_DIP0024, // Deployment of DIP0024 (Quorum Rotation) and decreased governance proposal fee
+    DEPLOYMENT_DIP0027_ASSETLOCKS, // Deployment of DIP0027 (Credit Asset Locks)
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
@@ -123,6 +124,7 @@ struct Params {
     LLMQType llmqTypeDIP0024InstantSend{LLMQType::LLMQ_NONE};
     LLMQType llmqTypePlatform{LLMQType::LLMQ_NONE};
     LLMQType llmqTypeMnhf{LLMQType::LLMQ_NONE};
+    LLMQType llmqTypeAssetLocks{LLMQType::LLMQ_NONE};
 };
 } // namespace Consensus
 

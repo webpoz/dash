@@ -5,6 +5,7 @@
 #ifndef BITCOIN_EVO_CBTX_H
 #define BITCOIN_EVO_CBTX_H
 
+#include <core_io.h>
 #include <primitives/transaction.h>
 #include <univalue.h>
 
@@ -22,12 +23,13 @@ class CCbTx
 {
 public:
     static constexpr auto SPECIALTX_TYPE = TRANSACTION_COINBASE;
-    static constexpr uint16_t CURRENT_VERSION = 2;
+    static constexpr uint16_t CURRENT_VERSION = 3;
 
     uint16_t nVersion{CURRENT_VERSION};
     int32_t nHeight{0};
     uint256 merkleRootMNList;
     uint256 merkleRootQuorums;
+    CAmount assetLockedAmount{0};
 
     SERIALIZE_METHODS(CCbTx, obj)
     {
@@ -35,6 +37,10 @@ public:
 
         if (obj.nVersion >= 2) {
             READWRITE(obj.merkleRootQuorums);
+        }
+
+        if (obj.nVersion >= 3) {
+            READWRITE(obj.assetLockedAmount);
         }
     }
 
@@ -49,6 +55,9 @@ public:
         obj.pushKV("merkleRootMNList", merkleRootMNList.ToString());
         if (nVersion >= 2) {
             obj.pushKV("merkleRootQuorums", merkleRootQuorums.ToString());
+        }
+        if (nVersion >= 3)  {
+            obj.pushKV("assetLockedAmount", ValueFromAmount(assetLockedAmount));
         }
     }
 };

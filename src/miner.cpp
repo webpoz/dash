@@ -24,6 +24,7 @@
 
 #include <evo/specialtx.h>
 #include <evo/cbtx.h>
+#include <evo/creditpool.h>
 #include <evo/simplifiedmns.h>
 #include <governance/governance.h>
 #include <llmq/blockprocessor.h>
@@ -107,6 +108,9 @@ void BlockAssembler::resetBlock()
     nFees = 0;
 }
 
+Optional<int64_t> BlockAssembler::m_last_block_num_txs{nullopt};
+Optional<int64_t> BlockAssembler::m_last_block_size{nullopt};
+
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     int64_t nTimeStart = GetTimeMicros();
@@ -132,6 +136,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     bool fDIP0003Active_context = nHeight >= chainparams.GetConsensus().DIP0003Height;
     bool fDIP0008Active_context = nHeight >= chainparams.GetConsensus().DIP0008Height;
+    bool fDIP0027AssetLocksActive_context = llmq::utils::IsDIP0027AssetLocksActive(::ChainActive().Tip());
 
     pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), chainparams.BIP9CheckMasternodesUpgraded());
     // -regtest only: allow overriding block.nVersion with
@@ -165,7 +170,12 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated);
+
+    std::optional<CCreditPoolManager> creditPoolManager;
+    if (fDIP0027AssetLocksActive_context) {
+        creditPoolManager.emplace(GetCbForBlock(pindexPrev, Params().GetConsensus()));
+    }
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
 
     int64_t nTime1 = GetTimeMicros();
 
@@ -196,7 +206,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
         CCbTx cbTx;
 
-        if (fDIP0008Active_context) {
+        if (fDIP0027AssetLocksActive_context) {
+            cbTx.nVersion = 3;
+            cbTx.assetLockedAmount = creditPoolManager->getTotalLocked();
+        } else if (fDIP0008Active_context) {
             cbTx.nVersion = 2;
         } else {
             cbTx.nVersion = 1;
@@ -366,7 +379,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager)
 {
     AssertLockHeld(m_mempool.cs);
 
@@ -420,6 +433,21 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
                 // Either no entry in mapModifiedTx, or it's worse than mapTx.
                 // Increment mi for the next loop iteration.
                 ++mi;
+            }
+        }
+
+        if (creditPoolManager) {
+            CValidationState state;
+
+            if (!creditPoolManager->processTransaction(iter->GetTx(), state)) {
+                if (fUsingModified) {
+                    mapModifiedTx.get<ancestor_score>().erase(modit);
+                    failedTx.insert(iter);
+                }
+                LogPrintf("unlock/lock failed due %s txid %s\n",
+                          FormatStateMessage(state),
+                          iter->GetTx().GetHash().ToString());
+                continue;
             }
         }
 
