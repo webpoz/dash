@@ -4,22 +4,12 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-import time
 import hashlib
-
-from io import BytesIO
 from decimal import Decimal
+from io import BytesIO
+
 from test_framework.authproxy import JSONRPCException
-
-from test_framework.test_framework import DashTestFramework
-from test_framework.util import (
-        connect_nodes,
-        assert_equal,
-        wait_until,
-    )
-
 from test_framework.key import ECKey
-
 from test_framework.messages import (
     FromHex,
     CAssetLockTx,
@@ -30,7 +20,6 @@ from test_framework.messages import (
     COIN,
     CTransaction,
 )
-
 from test_framework.script import (
     hash160,
     CScript,
@@ -39,6 +28,11 @@ from test_framework.script import (
     OP_CHECKSIG,
     OP_DUP,
     OP_EQUALVERIFY,
+)
+from test_framework.test_framework import DashTestFramework
+from test_framework.util import (
+    assert_equal,
+    wait_until,
 )
 
 llmq_type_test = 100
@@ -116,8 +110,8 @@ def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     unlock_tx.vExtraPayload = unlockTx_payload.serialize()
     return unlock_tx
 
-def get_credit_pool(node, block_hash = None):
-    if not block_hash:
+def get_credit_pool_amount(node, block_hash = None):
+    if block_hash is None:
         block_hash = node.getbestblockhash()
     block = node.getblock(block_hash)
     return int(COIN * block['cbTx']['assetLockedAmount'])
@@ -136,16 +130,21 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(result_expected, result_test)
         assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
 
+    def set_sporks(self):
+        spork_enabled = 0
+        spork_disabled = 4070908800
+    
+        self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", spork_enabled)
+        self.nodes[0].sporkupdate("SPORK_19_CHAINLOCKS_ENABLED", spork_disabled)
+        self.nodes[0].sporkupdate("SPORK_3_INSTANTSEND_BLOCK_FILTERING", spork_disabled)
+        self.nodes[0].sporkupdate("SPORK_2_INSTANTSEND_ENABLED", spork_disabled)
+        self.wait_for_sporks_same()
+
     def run_test(self):
         node = self.nodes[0]
 
         self.activate_dip0027_assetlocks()
-
-        self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", 0)
-        self.nodes[0].sporkupdate("SPORK_19_CHAINLOCKS_ENABLED", 4070908800)
-        self.nodes[0].sporkupdate("SPORK_3_INSTANTSEND_BLOCK_FILTERING", 4070908800)
-        self.nodes[0].sporkupdate("SPORK_2_INSTANTSEND_ENABLED", 4070908800)
-        self.wait_for_sporks_same()
+        self.set_sporks()
 
         self.mempool_size = 0
         assert_equal(node.getmempoolinfo()['size'], self.mempool_size)
@@ -164,7 +163,7 @@ class AssetLocksTest(DashTestFramework):
             result_expected=[{'txid': asset_lock_tx.rehash(), 'allowed': True }],
             rawtxs=[asset_lock_tx.serialize().hex()],
         )
-        assert_equal(get_credit_pool(node), 0)
+        assert_equal(get_credit_pool_amount(node), 0)
         txid_in_block = node.sendrawtransaction(hexstring=asset_lock_tx.serialize().hex(), maxfeerate=0)
 
         node.generate(13)
@@ -174,7 +173,7 @@ class AssetLocksTest(DashTestFramework):
         block_hash_1 = node.gettransaction(txid_in_block)['blockhash']
         self.log.info(block_hash_1)
 
-        assert_equal(get_credit_pool(node), locked_1)
+        assert_equal(get_credit_pool_amount(node), locked_1)
 
         self.log.info("Mining a quorum...")
         self.mine_quorum()
@@ -216,11 +215,11 @@ class AssetLocksTest(DashTestFramework):
         node.generate(13)
         self.sync_all()
 
-        assert_equal(get_credit_pool(node), locked_1 - COIN)
-        assert_equal(get_credit_pool(node, block_hash_1), locked_1)
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
+        assert_equal(get_credit_pool_amount(node, block_hash_1), locked_1)
 
         # too big withdrawal should not be mined
-        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 201, 1 + get_credit_pool(node), pubkey)
+        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 201, 1 + get_credit_pool_amount(node), pubkey)
         self.check_mempool_result(
             result_expected=[{'txid': aset_unlock_tx_full.rehash(), 'allowed': True }],
             rawtxs=[aset_unlock_tx_full.serialize().hex()],
@@ -236,7 +235,7 @@ class AssetLocksTest(DashTestFramework):
             assert "Invalid or non-wallet transaction id" in e.error['message']
 
         self.mempool_size += 1
-        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool(node), pubkey)
+        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool_amount(node), pubkey)
         self.check_mempool_result(
             result_expected=[{'txid': aset_unlock_tx_full.rehash(), 'allowed': True }],
             rawtxs=[aset_unlock_tx_full.serialize().hex()],
@@ -245,7 +244,7 @@ class AssetLocksTest(DashTestFramework):
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
         node.generate(13)
         self.sync_all()
-        assert_equal(get_credit_pool(node), 0)
+        assert_equal(get_credit_pool_amount(node), 0)
 
 if __name__ == '__main__':
     AssetLocksTest().main()
