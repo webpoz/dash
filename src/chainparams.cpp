@@ -316,7 +316,6 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_400_85;
-        // TODO or which one?
         consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_400_85;
 
         fDefaultConsistencyChecks = false;

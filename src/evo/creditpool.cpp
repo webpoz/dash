@@ -36,7 +36,6 @@ bool CCreditPoolManager::lock(const CTransaction& tx, CValidationState& state)
 static bool getAmountToUnlock(const CTransaction& tx, CAmount fee, CAmount& txUnlocked) {
     txUnlocked = fee;
     for (const CTxOut& txout : tx.vout) {
-//        const CScript& script = txout.scriptPubKey;
         if (txout.nValue < 0) return false;
         txUnlocked += txout.nValue;
     }
