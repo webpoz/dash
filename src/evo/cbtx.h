@@ -5,7 +5,6 @@
 #ifndef BITCOIN_EVO_CBTX_H
 #define BITCOIN_EVO_CBTX_H
 
-#include <core_io.h>
 #include <primitives/transaction.h>
 #include <univalue.h>
 
@@ -17,6 +16,9 @@ class CValidationState;
 namespace llmq {
 class CQuorumBlockProcessor;
 }// namespace llmq
+
+// Forward declaration from core_io to get rid of circular dependency
+UniValue ValueFromAmount(const CAmount& amount);
 
 // coinbase transaction
 class CCbTx

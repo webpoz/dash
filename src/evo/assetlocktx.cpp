@@ -108,11 +108,10 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
     }
 
-    const std::string CBLSIG_ASSETLOCKS_REQUESTID_PREFIX = "plwdtx";
-    std::string id(CBLSIG_ASSETLOCKS_REQUESTID_PREFIX + std::to_string(index));
+    const std::string id(strprintf("plwdtx%lld", index));
 
     std::vector<uint8_t> vchHash(32);
-    CSHA256().Write((const unsigned char*)id.data(), id.size()).Finalize(vchHash.data());
+    CSHA256().Write(reinterpret_cast<const uint8_t*>(id.data()), id.size()).Finalize(vchHash.data());
     uint256 requestId(vchHash);
 
     // We check only current quorum and previous one, not further

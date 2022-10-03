@@ -88,7 +88,6 @@ class NULLDUMMYTest(BitcoinTestFramework):
 
     def block_submit(self, node, txs, accept = False):
         dip4_activated = self.lastblockheight + 1 >= 432
-        info = node.getblockchaininfo()
         dip27_activated = get_bip9_status(self.nodes[0], 'dip0027-asset-locks')['status'] == 'active'
         block = create_block(self.tip, create_coinbase(self.lastblockheight + 1, dip4_activated=dip4_activated, dip27_activated=dip27_activated), self.lastblocktime + 1)
         block.nVersion = 4
