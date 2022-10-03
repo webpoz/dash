@@ -75,9 +75,9 @@ public:
 
 private:
     uint16_t nVersion{CURRENT_VERSION};
-    uint64_t index;
+    uint64_t index{0};
     CAmount fee{0};
-    uint32_t requestedHeight;
+    uint32_t requestedHeight{0};
     uint256 quorumHash;
     CBLSSignature quorumSig;
 
