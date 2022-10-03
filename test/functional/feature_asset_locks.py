@@ -133,7 +133,7 @@ class AssetLocksTest(DashTestFramework):
     def set_sporks(self):
         spork_enabled = 0
         spork_disabled = 4070908800
-    
+
         self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", spork_enabled)
         self.nodes[0].sporkupdate("SPORK_19_CHAINLOCKS_ENABLED", spork_disabled)
         self.nodes[0].sporkupdate("SPORK_3_INSTANTSEND_BLOCK_FILTERING", spork_disabled)

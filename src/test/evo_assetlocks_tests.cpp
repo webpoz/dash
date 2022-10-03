@@ -134,7 +134,6 @@ BOOST_FIXTURE_TEST_CASE(evo_assetlock, TestChain100Setup)
     BOOST_CHECK_MESSAGE(CheckTransaction(CTransaction(tx), state), strTest);
     BOOST_CHECK(state.IsValid());
 
-//    maybe_error status = CheckAssetLockTx(CTransaction(tx));
     BOOST_CHECK(!CheckAssetLockTx(CTransaction(tx)).did_err);
 
     BOOST_CHECK(AreInputsStandard(CTransaction(tx), coins));
@@ -267,8 +266,6 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
     BOOST_CHECK_MESSAGE(CheckTransaction(CTransaction(tx), state), strTest);
     BOOST_CHECK(state.IsValid());
 
-//    maybe_error status = CheckAssetUnlockTx(CTransaction(tx), nullptr);
-
     BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), nullptr).error_str == "bad-assetunlock-quorum-hash");
 
     {
@@ -331,7 +328,6 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         txManyOutputs.vout.resize(outputsLimit + 1);
         txManyOutputs.vout.back().nValue = CENT;
         txManyOutputs.vout.back().scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-//        maybe_error status = CheckAssetUnlockTx(CTransaction(txManyOutputs), nullptr);
         BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), nullptr).error_str == "bad-assetunlocktx-too-many-outs");
     }
 
