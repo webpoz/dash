@@ -333,6 +333,27 @@ public:
     bool Recover(const std::vector<CBLSSignature>& sigs, const std::vector<CBLSId>& ids);
 };
 
+class CBLSPublicKeyVersionWrapper {
+private:
+    bool legacy;
+    const CBLSPublicKey & obj;
+public:
+    CBLSPublicKeyVersionWrapper(const CBLSPublicKey & obj, bool legacy)
+    : obj(obj)
+    , legacy(legacy)
+    {}
+    template <typename Stream>
+    inline void Serialize(Stream& s) const {
+        obj.Serialize(s, legacy);
+    }
+    template <typename Stream>
+    inline void Unserialize(Stream& s, bool checkMalleable = true) {
+        const_cast<CBLSPublicKey&>(obj).Unserialize(s, legacy, checkMalleable);
+    }
+};
+
+
+
 #ifndef BUILD_BITCOIN_INTERNAL
 template<typename BLSObject>
 class CBLSLazyWrapper
