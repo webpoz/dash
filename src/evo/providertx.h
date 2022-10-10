@@ -57,7 +57,7 @@ public:
                 obj.collateralOutpoint,
                 obj.addr,
                 obj.keyIDOwner,
-                CBLSPublicKeyVersionWrapper(obj.pubKeyOperator, (obj.nVersion == LEGACY_BLS_VERSION)),
+                CBLSPublicKeyVersionWrapper(const_cast<CBLSPublicKey&>(obj.pubKeyOperator), (obj.nVersion == LEGACY_BLS_VERSION)),
                 obj.keyIDVoting,
                 obj.nOperatorReward,
                 obj.scriptPayout,
@@ -183,7 +183,7 @@ public:
                 obj.nVersion,
                 obj.proTxHash,
                 obj.nMode,
-                CBLSPublicKeyVersionWrapper(obj.pubKeyOperator, (obj.nVersion == LEGACY_BLS_VERSION)),
+                CBLSPublicKeyVersionWrapper(const_cast<CBLSPublicKey&>(obj.pubKeyOperator), (obj.nVersion == LEGACY_BLS_VERSION)),
                 obj.keyIDVoting,
                 obj.scriptPayout,
                 obj.inputsHash

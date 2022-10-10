@@ -336,9 +336,9 @@ public:
 class CBLSPublicKeyVersionWrapper {
 private:
     bool legacy;
-    const CBLSPublicKey & obj;
+    CBLSPublicKey& obj;
 public:
-    CBLSPublicKeyVersionWrapper(const CBLSPublicKey & obj, bool legacy)
+    CBLSPublicKeyVersionWrapper(CBLSPublicKey& obj, bool legacy)
     : obj(obj)
     , legacy(legacy)
     {}
@@ -348,7 +348,7 @@ public:
     }
     template <typename Stream>
     inline void Unserialize(Stream& s, bool checkMalleable = true) {
-        const_cast<CBLSPublicKey&>(obj).Unserialize(s, legacy, checkMalleable);
+        obj.Unserialize(s, legacy, checkMalleable);
     }
 };
 
