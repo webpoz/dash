@@ -52,7 +52,7 @@ def create_assetlock(node, coin, amount, pubkey):
 
     lock_tx = CTransaction()
     lock_tx.vin = inputs
-    lock_tx.vout = [tx_output, tx_output_ret]
+    lock_tx.vout = [tx_output, tx_output_ret] if remaining > 0 else [tx_output_ret]
     lock_tx.nVersion = 3
     lock_tx.nType = 8 # asset lock type
     lock_tx.vExtraPayload = lockTx_payload.serialize()
@@ -285,5 +285,21 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), 0)
 
+        # test withdrawal limits
+        total = get_credit_pool_amount(node)
+        while total <= 10000 * COIN:
+            coin = coins.pop()
+            to_lock = int((coin['amount'] - Decimal(0.0007)) * COIN)
+            total += to_lock
+            tx = create_assetlock(node, coin, to_lock, pubkey)
+            node.sendrawtransaction(hexstring=tx.serialize().hex(), maxfeerate=0)
+            print("total")
+            print(total)
+        node.generate(1)
+        self.sync_all()
+        print("locked: ")
+        print(get_credit_pool_amount(node))
+        assert_greater_than(get_credit_pool_amount(node), 10000 * COIN)
+            
 if __name__ == '__main__':
     AssetLocksTest().main()

@@ -17,16 +17,28 @@
 class CCreditPoolManager
 {
 private:
-    CAmount totalLocked;
+    CAmount prevLocked;
+    CAmount sessionLocked{0};
+    CAmount sessionUnlocked{0};
+    CAmount sessionLimit;
 
     bool lock(const CTransaction& tx, CValidationState& state);
 
     bool unlock(const CTransaction& tx, CValidationState& state);
 
 public:
-    CCreditPoolManager(CAmount totalLocked = 0)
-    : totalLocked(totalLocked)
-    {}
+    CCreditPoolManager(CAmount prevLocked = 0, CAmount latelyUnlocked = 0)
+    : prevLocked(prevLocked)
+    , sessionLimit(prevLocked)
+    {
+        if ((sessionLimit + latelyUnlocked > (prevLocked + latelyUnlocked) / 10) && (sessionLimit + latelyUnlocked > 1000 * COIN)) {
+            sessionLimit = (latelyUnlocked + prevLocked) / 10 - latelyUnlocked;
+            if (sessionLimit > prevLocked) sessionLimit = prevLocked;
+        }
+        if (prevLocked || latelyUnlocked) {
+//            std::cerr << "new credit pool manager: " << prevLocked << ' ' << latelyUnlocked << '\n' << sessionLimit << ' ' << '\n';
+        }
+    }
 
     ~CCreditPoolManager() = default;
 

@@ -28,7 +28,7 @@ bool CCreditPoolManager::lock(const CTransaction& tx, CValidationState& state)
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-lock-payload");
     }
 
-    totalLocked += getLockedAmount(tx);
+    sessionLocked += getLockedAmount(tx);
 
     return true;
 }
@@ -55,12 +55,11 @@ bool CCreditPoolManager::unlock(const CTransaction& tx, CValidationState& state)
     }
 
     // For now there's no proper limits of withdrawal
-    CAmount limit = std::min(totalLocked, 10'000 * COIN);
-    if (toUnlock > limit) {
+    if (sessionUnlocked + toUnlock > sessionLimit ) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unloock-too-much");
     }
 
-    totalLocked -= toUnlock;
+    sessionUnlocked += toUnlock;
     return true;
 }
 
@@ -85,5 +84,5 @@ bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationS
 
 CAmount CCreditPoolManager::getTotalLocked() const
 {
-    return totalLocked;
+    return prevLocked + sessionLocked - sessionUnlocked;
 }

@@ -7,6 +7,7 @@
 #include <miner.h>
 
 #include <amount.h>
+#include <cachemap.h>
 #include <chain.h>
 #include <chainparams.h>
 #include <consensus/consensus.h>
@@ -111,20 +112,74 @@ void BlockAssembler::resetBlock()
 Optional<int64_t> BlockAssembler::m_last_block_num_txs{nullopt};
 Optional<int64_t> BlockAssembler::m_last_block_size{nullopt};
 
-static CAmount GetCbForBlock(const CBlockIndex* block_index, const Consensus::Params& consensusParams) {
-    assert(block_index);
-    CBlock block;
-    if (!ReadBlockFromDisk(block, block_index, consensusParams)) {
-        throw std::runtime_error("failed-getcbforblock-read");
+namespace {
+struct CreditPoolCb {
+    CAmount locked;
+    CAmount latelyUnlocked;
+};
+} // anonymous namespace
+
+static bool getAmountToUnlock(const CTransaction& tx, CAmount& txUnlocked) {
+    if (tx.nVersion != 3) return true;
+    if (tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
+
+    CAssetUnlockPayload assetUnlockTx;
+    if (!GetTxPayload(tx, assetUnlockTx)) {
+        return false;
+//        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unlock-payload");
     }
-    if (block.vtx.size() < 1 || block.vtx[0]->vExtraPayload.empty())  {
-        return 0;
+    txUnlocked = assetUnlockTx.getFee();
+    for (const CTxOut& txout : tx.vout) {
+        if (txout.nValue < 0) return false;
+        txUnlocked += txout.nValue;
     }
-    CCbTx cbTx;
-    if (!GetTxPayload(block.vtx[0]->vExtraPayload, cbTx)) {
-        throw std::runtime_error("failed-getcbforblock-cbtx-payload");
+
+    return true;
+}
+
+static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensus::Params& consensusParams, size_t tailLength = 4032) {
+    if (block_index == nullptr) return {0, 0};
+
+    CreditPoolCb prev = tailLength
+        ? GetCbForBlock(block_index, consensusParams, tailLength - 1)
+        : CreditPoolCb{0, 0};
+
+    uint256 block_hash = block_index->GetBlockHash();
+
+    static CacheMap<uint256, CreditPoolCb> creditPoolCache(10000);
+
+    CreditPoolCb pool;
+    if (!creditPoolCache.HasKey(block_hash)) {
+        CBlock block;
+        if (!ReadBlockFromDisk(block, block_index, consensusParams)) {
+            throw std::runtime_error("failed-getcbforblock-read");
+        }
+        if (block.vtx.size() < 1 || block.vtx[0]->vExtraPayload.empty())  {
+            return prev;
+        }
+        CCbTx cbTx;
+        if (!GetTxPayload(block.vtx[0]->vExtraPayload, cbTx)) {
+            throw std::runtime_error("failed-getcbforblock-cbtx-payload");
+        }
+
+        CAmount blockUnlocked{0};
+        for (CTransactionRef tx : block.vtx) {
+            CAmount unlocked{0};
+
+            if (!getAmountToUnlock(*tx, unlocked)) {
+                throw std::runtime_error("failed-getcbforblock-cbtx-unlock");
+            }
+            blockUnlocked += unlocked;
+        }
+
+        pool = CreditPoolCb{cbTx.assetLockedAmount, blockUnlocked};
+        creditPoolCache.Insert(block_hash, pool);
     }
-    return cbTx.assetLockedAmount;
+
+    if (!creditPoolCache.Get(block_hash, pool)) {
+        throw std::runtime_error("failed-getcb-read-cache");
+    }
+    return {pool.locked, pool.latelyUnlocked + prev.latelyUnlocked};
 }
 
 std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& scriptPubKeyIn)
@@ -189,7 +244,8 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     std::optional<CCreditPoolManager> creditPoolManager;
     if (fDIP0027AssetLocksActive_context) {
-        creditPoolManager.emplace(GetCbForBlock(pindexPrev, Params().GetConsensus()));
+        CreditPoolCb creditPoolCb = GetCbForBlock(pindexPrev, Params().GetConsensus());
+        creditPoolManager.emplace(creditPoolCb.locked, creditPoolCb.latelyUnlocked);
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
 
