@@ -141,7 +141,7 @@ static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensu
     if (block_index == nullptr) return {0, 0};
 
     CreditPoolCb prev = tailLength
-        ? GetCbForBlock(block_index, consensusParams, tailLength - 1)
+        ? GetCbForBlock(block_index->pprev, consensusParams, tailLength - 1)
         : CreditPoolCb{0, 0};
 
     uint256 block_hash = block_index->GetBlockHash();
@@ -179,6 +179,8 @@ static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensu
     if (!creditPoolCache.Get(block_hash, pool)) {
         throw std::runtime_error("failed-getcb-read-cache");
     }
+    LogPrintf("CreditPoolManager getCb data %d.%08d %d.%08d %d.%08d\n", pool.locked / COIN, pool.locked % COIN, pool.latelyUnlocked / COIN, pool.latelyUnlocked % COIN,
+            prev.latelyUnlocked / COIN, prev.latelyUnlocked % COIN);
     return {pool.locked, pool.latelyUnlocked + prev.latelyUnlocked};
 }
 
@@ -245,7 +247,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     std::optional<CCreditPoolManager> creditPoolManager;
     if (fDIP0027AssetLocksActive_context) {
         CreditPoolCb creditPoolCb = GetCbForBlock(pindexPrev, Params().GetConsensus());
-        creditPoolManager.emplace(creditPoolCb.locked, creditPoolCb.latelyUnlocked);
+        creditPoolManager.emplace(pindexPrev, creditPoolCb.locked, creditPoolCb.latelyUnlocked);
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager, pindexPrev);
 

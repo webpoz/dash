@@ -118,7 +118,7 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
     if (height < requestedHeight || height >= (requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1)) {
         LogPrintf("Asset unlock tx %d with requested height %d won't be accepted on height: %d\n",
-                index, requestedHeight, height)
+                index, requestedHeight, height);
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
     }
 

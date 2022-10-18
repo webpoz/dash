@@ -12,7 +12,9 @@
 #include <sync.h>
 #include <threadsafety.h>
 
+#include <logging.h>
 #include <map>
+#include <chain.h>
 
 class CCreditPoolManager
 {
@@ -22,21 +24,25 @@ private:
     CAmount sessionUnlocked{0};
     CAmount sessionLimit;
 
+    CBlockIndex* pindexPrev;
+
     bool lock(const CTransaction& tx, CValidationState& state);
 
     bool unlock(const CTransaction& tx, CValidationState& state);
 
 public:
-    CCreditPoolManager(CAmount prevLocked = 0, CAmount latelyUnlocked = 0)
+    CCreditPoolManager(CBlockIndex* pindexPrev, CAmount prevLocked = 0, CAmount latelyUnlocked = 0)
     : prevLocked(prevLocked)
     , sessionLimit(prevLocked)
     {
         if ((sessionLimit + latelyUnlocked > (prevLocked + latelyUnlocked) / 10) && (sessionLimit + latelyUnlocked > 1000 * COIN)) {
-            sessionLimit = (latelyUnlocked + prevLocked) / 10 - latelyUnlocked;
+            sessionLimit = std::max<CAmount>(0, (latelyUnlocked + prevLocked) / 10 - latelyUnlocked);
             if (sessionLimit > prevLocked) sessionLimit = prevLocked;
         }
-        if (prevLocked || latelyUnlocked) {
-//            std::cerr << "new credit pool manager: " << prevLocked << ' ' << latelyUnlocked << '\n' << sessionLimit << ' ' << '\n';
+        if (prevLocked || latelyUnlocked || sessionLimit) {
+            LogPrintf("CreditPoolManager init on height %d: %d.%08d %d.%08d limited by %d.%08d\n", pindexPrev->nHeight, prevLocked / COIN, prevLocked % COIN,
+                   latelyUnlocked / COIN, latelyUnlocked % COIN, 
+                   sessionLimit / COIN, sessionLimit % COIN);
         }
     }
 

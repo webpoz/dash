@@ -6,6 +6,7 @@
 
 #include <rpc/blockchain.h>
 
+#include <evo/assetlocktx.h>
 #include <amount.h>
 #include <blockfilter.h>
 #include <chain.h>
@@ -498,6 +499,12 @@ static void entryToJSON(const CTxMemPool& pool, UniValue& info, const CTxMemPool
     info.pushKV("ancestorsize", e.GetSizeWithAncestors());
     info.pushKV("ancestorfees", e.GetModFeesWithAncestors());
     const CTransaction& tx = e.GetTx();
+    info.pushKV("details", tx.ToString());
+    if (tx.nType == TRANSACTION_ASSET_UNLOCK) {
+        CAssetUnlockPayload assetUnlockTx;
+        GetTxPayload(tx, assetUnlockTx);
+        info.pushKV("detaails-unlock", assetUnlockTx.ToString());
+    }
     std::set<std::string> setDepends;
     for (const CTxIn& txin : tx.vin)
     {
