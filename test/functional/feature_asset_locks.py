@@ -308,7 +308,7 @@ class AssetLocksTest(DashTestFramework):
         print(f'total locked: {PA(amount_to_withdraw)}')
         assert_greater_than(amount_to_withdraw, 11_000 * COIN)
         amount_under_limit = amount_to_withdraw // 10
-        amount = int(amount_under_limit * 0.95)
+        amount = int(amount_under_limit * 0.98)
         index = 400
 
         # take most of limit by one big tx for faster testing
@@ -329,21 +329,32 @@ class AssetLocksTest(DashTestFramework):
         print(f'expected to unlock no more than: {PA(amount_under_limit)}')
         print(f'new locked: {PA(get_credit_pool_amount(node))}')
         print(f'unlocked: {PA(total - get_credit_pool_amount(node))}')
+        new_total = get_credit_pool_amount(node)
         assert_greater_than(amount, amount_under_limit)
-        assert_greater_than_or_equal(amount_under_limit, total - get_credit_pool_amount(node))
-        assert_greater_than_or_equal(total-get_credit_pool_amount(node), amount_under_limit)
-        assert_greater(total - get_credit_pool_amount(node), 1000)
+        assert_greater_than_or_equal(amount_under_limit, total - new_total)
+        assert_greater_than(total - new_total, 1000)
         print("mempool:")
         print(self.nodes[0].getmempoolinfo()['size'])
+        node.generate(1)
+        self.sync_all()
+        assert_equal(new_total, get_credit_pool_amount(node))
+        print("mempool mined txes:")
+        print(self.nodes[0].getmempoolinfo()['size'])
         node.generate(100)
+        self.sync_all()
+        print("mempool extra 100 blocks:")
+        print(self.nodes[0].getmempoolinfo()['size'])
         # all tx should be dropped from mempool because new quorums
         node.generate(650)
         self.sync_all()
-        print("mempool:")
+        print("mempool extra 650 blocks")
         print(self.nodes[0].getmempoolinfo()['size'])
         print(node.getmempoolinfo())
         print(node.getrawmempool())
         print(node.getmempoolentry(node.getrawmempool()[0]))
+        print(node.getmempoolentry(node.getrawmempool()[1]))
+        # AMOUNT SHOULD BE SAME
+        assert_equal(new_total, get_credit_pool_amount(node))
         assert_equal(node.getmempoolinfo()['size'], 0)
 
             
