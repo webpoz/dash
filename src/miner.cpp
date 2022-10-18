@@ -249,7 +249,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CreditPoolCb creditPoolCb = GetCbForBlock(pindexPrev, Params().GetConsensus());
         creditPoolManager.emplace(pindexPrev, creditPoolCb.locked, creditPoolCb.latelyUnlocked);
     }
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager, pindexPrev);
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
 
     int64_t nTime1 = GetTimeMicros();
 
@@ -453,7 +453,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager, CBlockIndex* pindexPrev)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager)
 {
     AssertLockHeld(m_mempool.cs);
 
@@ -513,7 +513,7 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
         if (creditPoolManager) {
             CValidationState state;
 
-            if (!creditPoolManager->processTransaction(iter->GetTx(), state, pindexPrev)) {
+            if (!creditPoolManager->processTransaction(iter->GetTx(), state)) {
                 if (fUsingModified) {
                     mapModifiedTx.get<ancestor_score>().erase(modit);
                     failedTx.insert(iter);

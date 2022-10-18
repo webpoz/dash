@@ -63,7 +63,7 @@ bool CCreditPoolManager::unlock(const CTransaction& tx, CValidationState& state)
     return true;
 }
 
-bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationState& state, CBlockIndex* pindexPrev) {
+bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationState& state) {
     if (tx.nVersion != 3) return true;
     if (tx.nType != TRANSACTION_ASSET_LOCK && tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
 

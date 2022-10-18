@@ -34,6 +34,7 @@ public:
     CCreditPoolManager(CBlockIndex* pindexPrev, CAmount prevLocked = 0, CAmount latelyUnlocked = 0)
     : prevLocked(prevLocked)
     , sessionLimit(prevLocked)
+    , pindexPrev(pindexPrev)
     {
         if ((sessionLimit + latelyUnlocked > (prevLocked + latelyUnlocked) / 10) && (sessionLimit + latelyUnlocked > 1000 * COIN)) {
             sessionLimit = std::max<CAmount>(0, (latelyUnlocked + prevLocked) / 10 - latelyUnlocked);
@@ -50,7 +51,7 @@ public:
 
     // This function should be called for each Asset Lock/Unlock tx
     // to change amount of credit pool
-    bool processTransaction(const CTransaction& tx, CValidationState& state, CBlockIndex* pindexPrev);
+    bool processTransaction(const CTransaction& tx, CValidationState& state);
 
     CAmount getTotalLocked() const;
 };
