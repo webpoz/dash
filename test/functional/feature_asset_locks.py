@@ -32,10 +32,13 @@ from test_framework.script import (
 from test_framework.test_framework import DashTestFramework
 from test_framework.util import (
     assert_equal,
+    assert_greater_than,
+    assert_greater_than_or_equal,
     wait_until,
 )
 
 llmq_type_test = 100
+tiny_amount = int(Decimal("0.0007") * COIN)
 
 def create_assetlock(node, coin, amount, pubkey):
     inputs = [CTxIn(COutPoint(int(coin["txid"], 16), coin["vout"]))]
@@ -44,8 +47,7 @@ def create_assetlock(node, coin, amount, pubkey):
 
     lockTx_payload = CAssetLockTx(1, 0, [credit_outputs])
 
-    fee = Decimal(0.00070000)
-    remaining = int(COIN * coin['amount']) - int(COIN * fee) - credit_outputs.nValue
+    remaining = int(COIN * coin['amount']) - tiny_amount - credit_outputs.nValue
 
     tx_output_ret = CTxOut(credit_outputs.nValue, CScript([OP_RETURN, b""]))
     tx_output = CTxOut(remaining, CScript([pubkey, OP_CHECKSIG]))
@@ -71,8 +73,7 @@ def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     def wait_for_sigs(mninfo, id, msgHash, timeout):
         wait_until(lambda: check_sigs(mninfo, id, msgHash), timeout = timeout)
 
-    fee = int(0.00000700 * COIN)
-    tx_output = CTxOut(int(withdrawal) - fee, CScript([pubkey, OP_CHECKSIG]))
+    tx_output = CTxOut(int(withdrawal) - tiny_amount, CScript([pubkey, OP_CHECKSIG]))
 
     # request ID = sha256("plwdtx", index)
     sha256 = hashlib.sha256()
@@ -84,7 +85,7 @@ def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     unlockTx_payload = CAssetUnlockTx(
         version = 1,
         index = index,
-        fee = fee,
+        fee = tiny_amount,
         requestedHeight = height,
         quorumHash = int(quorumHash, 16),
         quorumSig = b'\00' * 96)
@@ -96,6 +97,7 @@ def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     unlock_tx.nType = 9 # asset unlock type
     unlock_tx.vExtraPayload = unlockTx_payload.serialize()
 
+    print(f'unlock {PA(withdrawal)} on {height} by {index}')
     unlock_tx.calc_sha256()
     msgHash = format(unlock_tx.sha256, '064x')
 
@@ -115,6 +117,9 @@ def get_credit_pool_amount(node, block_hash = None):
         block_hash = node.getbestblockhash()
     block = node.getblock(block_hash)
     return int(COIN * block['cbTx']['assetLockedAmount'])
+
+def PA(amount):
+    return f'{int(amount) // COIN}.{int(amount) % COIN}'
 
 class AssetLocksTest(DashTestFramework):
     def set_test_params(self):
@@ -286,20 +291,61 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), 0)
 
         # test withdrawal limits
+        # fast-forward to next day to reset previous limits
+        node.generate(576 + 1)
+        self.sync_all()
+        self.mine_quorum()
         total = get_credit_pool_amount(node)
-        while total <= 10000 * COIN:
+        while total <= 20_000 * COIN:
             coin = coins.pop()
-            to_lock = int((coin['amount'] - Decimal(0.0007)) * COIN)
+            to_lock = int(coin['amount'] * COIN) - tiny_amount
             total += to_lock
             tx = create_assetlock(node, coin, to_lock, pubkey)
             node.sendrawtransaction(hexstring=tx.serialize().hex(), maxfeerate=0)
-            print("total")
-            print(total)
         node.generate(1)
         self.sync_all()
-        print("locked: ")
-        print(get_credit_pool_amount(node))
-        assert_greater_than(get_credit_pool_amount(node), 10000 * COIN)
+        amount_to_withdraw = get_credit_pool_amount(node)
+        print(f'total locked: {PA(amount_to_withdraw)}')
+        assert_greater_than(amount_to_withdraw, 11_000 * COIN)
+        amount_under_limit = amount_to_withdraw // 10
+        amount = int(amount_under_limit * 0.95)
+        index = 400
+
+        # take most of limit by one big tx for faster testing
+        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, amount, pubkey)
+        node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        node.generate(1)
+        self.sync_all()
+        while amount < amount_under_limit:
+            next = COIN * 5
+            amount += next
+            index += 1
+            asset_unlock_tx = create_assetunlock(node, self.mninfo, index, next, pubkey)
+            node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        print(f"mempool: {node.getmempoolinfo()['size']}")
+        node.generate(1)
+        self.sync_all()
+        print(f'trying to unlock: {PA(amount)}')
+        print(f'expected to unlock no more than: {PA(amount_under_limit)}')
+        print(f'new locked: {PA(get_credit_pool_amount(node))}')
+        print(f'unlocked: {PA(total - get_credit_pool_amount(node))}')
+        assert_greater_than(amount, amount_under_limit)
+        assert_greater_than_or_equal(amount_under_limit, total - get_credit_pool_amount(node))
+        assert_greater_than_or_equal(total-get_credit_pool_amount(node), amount_under_limit)
+        assert_greater(total - get_credit_pool_amount(node), 1000)
+        print("mempool:")
+        print(self.nodes[0].getmempoolinfo()['size'])
+        node.generate(100)
+        # all tx should be dropped from mempool because new quorums
+        node.generate(650)
+        self.sync_all()
+        print("mempool:")
+        print(self.nodes[0].getmempoolinfo()['size'])
+        print(node.getmempoolinfo())
+        print(node.getrawmempool())
+        print(node.getmempoolentry(node.getrawmempool()[0]))
+        assert_equal(node.getmempoolinfo()['size'], 0)
+
             
 if __name__ == '__main__':
     AssetLocksTest().main()
