@@ -137,7 +137,7 @@ static bool getAmountToUnlock(const CTransaction& tx, CAmount& txUnlocked) {
     return true;
 }
 
-static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensus::Params& consensusParams, size_t tailLength = 4032) {
+static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensus::Params& consensusParams, size_t tailLength = 576) {
     if (block_index == nullptr) return {0, 0};
 
     CreditPoolCb prev = tailLength
@@ -146,7 +146,7 @@ static CreditPoolCb GetCbForBlock(const CBlockIndex* block_index, const Consensu
 
     uint256 block_hash = block_index->GetBlockHash();
 
-    static CacheMap<uint256, CreditPoolCb> creditPoolCache(10000);
+    static CacheMap<uint256, CreditPoolCb> creditPoolCache(1000);
 
     CreditPoolCb pool;
     if (!creditPoolCache.HasKey(block_hash)) {
@@ -247,7 +247,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         CreditPoolCb creditPoolCb = GetCbForBlock(pindexPrev, Params().GetConsensus());
         creditPoolManager.emplace(creditPoolCb.locked, creditPoolCb.latelyUnlocked);
     }
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager, pindexPrev);
 
     int64_t nTime1 = GetTimeMicros();
 
@@ -451,7 +451,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager, CBlockIndex* pindexPrev)
 {
     AssertLockHeld(m_mempool.cs);
 
@@ -511,12 +511,12 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
         if (creditPoolManager) {
             CValidationState state;
 
-            if (!creditPoolManager->processTransaction(iter->GetTx(), state)) {
+            if (!creditPoolManager->processTransaction(iter->GetTx(), state, pindexPrev)) {
                 if (fUsingModified) {
                     mapModifiedTx.get<ancestor_score>().erase(modit);
                     failedTx.insert(iter);
                 }
-                LogPrintf("unlock/lock failed due %s txid %s\n",
+                LogPrintf("asset locks tx skipped due %s txid %s\n",
                           FormatStateMessage(state),
                           iter->GetTx().GetHash().ToString());
                 continue;

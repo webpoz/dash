@@ -63,8 +63,13 @@ bool CCreditPoolManager::unlock(const CTransaction& tx, CValidationState& state)
     return true;
 }
 
-bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationState& state) {
+bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationState& state, CBlockIndex* pindexPrev) {
     if (tx.nVersion != 3) return true;
+    if (tx.nType != TRANSACTION_ASSET_LOCK && tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
+
+    if (auto maybeError = CheckCreditLocksTx(tx, pindexPrev); maybeError.did_err) {
+        return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
+    }
 
     try {
         switch (tx.nType) {

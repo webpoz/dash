@@ -44,7 +44,7 @@ public:
 
     // This function should be called for each Asset Lock/Unlock tx
     // to change amount of credit pool
-    bool processTransaction(const CTransaction& tx, CValidationState& state);
+    bool processTransaction(const CTransaction& tx, CValidationState& state, CBlockIndex* pindexPrev);
 
     CAmount getTotalLocked() const;
 };
