@@ -173,7 +173,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     std::optional<CCreditPoolManager> creditPoolManager;
     if (fDIP0027AssetLocksActive_context) {
-        creditPoolManager.emplace(pindexPrev, GetCbForBlock(pindexPrev, Params().GetConsensus()));
+        creditPoolManager.emplace(pindexPrev, Params().GetConsensus());
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
 
