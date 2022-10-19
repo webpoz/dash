@@ -15,6 +15,21 @@
 #include <llmq/quorums.h>
 
 /*
+   Common code for Asset Lock and Asset Unlock
+    */
+maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev)
+{
+    switch (tx.nType) {
+    case TRANSACTION_ASSET_LOCK:
+        return CheckAssetLockTx(tx);
+    case TRANSACTION_ASSET_UNLOCK:
+        return CheckAssetUnlockTx(tx, pindexPrev);
+    default:
+        return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-not-asset-locks-at-all"};
+    }
+}
+
+/*
    Asset Lock Transaction
    */
 maybe_error CheckAssetLockTx(const CTransaction& tx)
@@ -105,6 +120,8 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
 
     int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
     if (height < requestedHeight || height >= (requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1)) {
+        LogPrintf("Asset unlock tx %d with requested height %d could not be accepted on height: %d\n",
+                index, requestedHeight, height);
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
     }
 

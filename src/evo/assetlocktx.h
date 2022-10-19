@@ -134,5 +134,6 @@ public:
 
 maybe_error CheckAssetLockTx(const CTransaction& tx);
 maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev);
+maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev);
 
 #endif // BITCOIN_EVO_ASSETLOCKTX_H
