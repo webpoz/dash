@@ -45,18 +45,11 @@ bool CheckSpecialTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVali
         case TRANSACTION_MNHF_SIGNAL:
             return VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE && CheckMNHFTx(tx, pindexPrev, state);
         case TRANSACTION_ASSET_LOCK:
-            if (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS) != ThresholdState::ACTIVE) {
-                return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "dip-creditlocks-not-active");
-            }
-            if (auto maybeError = CheckAssetLockTx(tx); maybeError.did_err) {
-                return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
-            }
-            return true;
         case TRANSACTION_ASSET_UNLOCK:
             if (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS) != ThresholdState::ACTIVE) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "dip-creditlocks-not-active");
             }
-            if (auto maybeError = CheckAssetUnlockTx(tx, pindexPrev); maybeError.did_err) {
+            if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev); maybeError.did_err) {
                 return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
             }
             return true;

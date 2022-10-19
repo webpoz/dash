@@ -14,9 +14,13 @@
 
 #include <map>
 
+class CBlockIndex;
+
 class CCreditPoolManager
 {
 private:
+    CBlockIndex* pindexPrev;
+
     CAmount totalLocked;
 
     bool lock(const CTransaction& tx, CValidationState& state);
@@ -24,8 +28,9 @@ private:
     bool unlock(const CTransaction& tx, CValidationState& state);
 
 public:
-    CCreditPoolManager(CAmount totalLocked = 0)
-    : totalLocked(totalLocked)
+    CCreditPoolManager(CBlockIndex* pindexPrev, CAmount totalLocked = 0)
+    : pindexPrev(pindexPrev)
+    , totalLocked(totalLocked)
     {}
 
     ~CCreditPoolManager() = default;

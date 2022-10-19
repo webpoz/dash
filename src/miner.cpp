@@ -189,7 +189,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     std::optional<CCreditPoolManager> creditPoolManager;
     if (fDIP0027AssetLocksActive_context) {
-        creditPoolManager.emplace(GetCbForBlock(pindexPrev, Params().GetConsensus()));
+        creditPoolManager.emplace(pindexPrev, GetCbForBlock(pindexPrev, Params().GetConsensus()));
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
 
@@ -460,7 +460,7 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
                     mapModifiedTx.get<ancestor_score>().erase(modit);
                     failedTx.insert(iter);
                 }
-                LogPrintf("unlock/lock failed due %s txid %s\n",
+                LogPrintf("asset locks tx skipped due %s txid %s\n",
                           FormatStateMessage(state),
                           iter->GetTx().GetHash().ToString());
                 continue;
