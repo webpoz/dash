@@ -152,6 +152,9 @@ bool CCreditPoolManager::processTransaction(const CTransaction& tx, CValidationS
     if (tx.nType != TRANSACTION_ASSET_LOCK && tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
 
     if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev); maybeError.did_err) {
+        if (maybeError.error_str == "bad-assetunlock-too-late") {
+            toDelete.emplace(tx.GetHash(), mempool.get(tx.GetHash()));
+        }
         return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
     }
 

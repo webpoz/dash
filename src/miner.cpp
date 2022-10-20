@@ -176,6 +176,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
         creditPoolManager.emplace(pindexPrev, Params().GetConsensus());
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
+    for (const auto& p : creditPoolManager->getExpiryUnlocks()) {
+        const_cast<CTxMemPool&>(m_mempool).removeRecursive(*p.second, MemPoolRemovalReason::EXPIRY);
+    }
 
     int64_t nTime1 = GetTimeMicros();
 

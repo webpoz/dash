@@ -9,10 +9,11 @@
 
 #include <evo/assetlocktx.h>
 
+#include <saltedhasher.h>
 #include <sync.h>
 #include <threadsafety.h>
 
-#include <map>
+#include <unordered_map>
 
 class CBlockIndex;
 namespace Consensus
@@ -30,6 +31,8 @@ private:
     CAmount sessionLocked{0};
     CAmount sessionUnlocked{0};
 
+    std::unordered_map<uint256, CTransactionRef, StaticSaltedHasher> toDelete;
+
     bool lock(const CTransaction& tx, CValidationState& state);
 
     bool unlock(const CTransaction& tx, CValidationState& state);
@@ -46,6 +49,8 @@ public:
     bool processTransaction(const CTransaction& tx, CValidationState& state);
 
     CAmount getTotalLocked() const;
+
+    const std::unordered_map<uint256, CTransactionRef, StaticSaltedHasher> getExpiryUnlocks() { return toDelete; }
 };
 
 #endif
