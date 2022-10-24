@@ -344,8 +344,5 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(new_total, get_credit_pool_amount(node))
         # TODO FIX IT, should be 0 if mempool is cleared properly!
         assert_equal(node.getmempoolinfo()['size'], 2)
-
-
-        # TODO to test that asset unlock can't be spent before it is mined to block
 if __name__ == '__main__':
     AssetLocksTest().main()
