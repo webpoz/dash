@@ -8,6 +8,8 @@ import hashlib
 from decimal import Decimal
 from io import BytesIO
 
+from test_framework.blocktools import create_block, create_coinbase, create_tx_with_script
+
 from test_framework.authproxy import JSONRPCException
 from test_framework.key import ECKey
 from test_framework.messages import (
@@ -19,6 +21,7 @@ from test_framework.messages import (
     CTxIn,
     COIN,
     CTransaction,
+    ToHex,
 )
 from test_framework.script import (
     hash160,
@@ -227,6 +230,7 @@ class AssetLocksTest(DashTestFramework):
         asset_unlock_tx_payload = CAssetUnlockTx()
         asset_unlock_tx_payload.deserialize(BytesIO(asset_unlock_tx.vExtraPayload))
 
+        # validate that we calculate payload hash correctly: ask quorum forcely by message hash
         assert_equal(asset_unlock_tx_payload.quorumHash, int(self.mninfo[0].node.quorum("selectquorum", llmq_type_test, 'e6c7a809d79f78ea85b72d5df7e9bd592aecf151e679d6e976b74f053a7f9056')["quorumHash"], 16))
 
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
@@ -285,6 +289,34 @@ class AssetLocksTest(DashTestFramework):
             rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
         )
 
+        # ----- test manually created block
+        if False:
+            best_block = node.getblock(node.getbestblockhash())
+            tip = int(node.getbestblockhash(), 16)
+            height = best_block["height"] + 1
+            block_time = best_block["time"] + 1
+
+
+            block = create_block(tip, create_coinbase(height), block_time)
+            # Forcibly mine asset_unlock_tx_too_late and ensure block is invalid
+            # see https://github.com/dashpay/dash/blob/6dbc9aba0d37c677be9c091112654963a77b3a97/test/functional/feature_dip3_deterministicmns.py#L428-L434
+            print("block txes")
+            print(block.vtx)
+            print(asset_unlock_tx_too_late)
+            block.vtx.append(asset_unlock_tx_too_late)
+            print(block.vtx)
+            block.hashMerkleRoot = block.calc_merkle_root()
+            block.solve()
+            result = node.submitblock(ToHex(block))
+            print("result:")
+            print(result)
+            # Expect an error here
+            if expected_error is not None and result != expected_error:
+                raise AssertionError('mining the block should have failed with error %s, but submitblock returned %s' % (expected_error, result))
+            elif expected_error is None and result is not None:
+                raise AssertionError('submitblock returned %s' % (result))
+
+        # ----
         node.generate(13)
         self.sync_all()
 
