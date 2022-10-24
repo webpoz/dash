@@ -102,9 +102,13 @@ CCreditPoolManager::CCreditPoolManager(CBlockIndex* pindexPrev, const Consensus:
     this->sessionLimit = this->prevLocked;
     CAmount latelyUnlocked = creditPoolCb.latelyUnlocked;
 
-    if ((sessionLimit + latelyUnlocked > (prevLocked + latelyUnlocked) / 10) && (sessionLimit + latelyUnlocked > LimitAmount)) {
+    // # max(100, min(.10 * assetlockpool, 1000))
+    if ((sessionLimit + latelyUnlocked > (prevLocked + latelyUnlocked) / 10) && (sessionLimit + latelyUnlocked > LimitAmountLow)) {
         sessionLimit = std::max<CAmount>(0, (latelyUnlocked + prevLocked) / 10 - latelyUnlocked);
         if (sessionLimit > prevLocked) sessionLimit = prevLocked;
+    }
+    if (sessionLimit + latelyUnlocked > LimitAmountHigh) {
+        sessionLimit = LimitAmountHigh - latelyUnlocked;
     }
     if (prevLocked || latelyUnlocked || sessionLimit) {
         LogPrintf("CreditPoolManager init on height %d: %d.%08d %d.%08d limited by %d.%08d\n", pindexPrev->nHeight, prevLocked / COIN, prevLocked % COIN,
