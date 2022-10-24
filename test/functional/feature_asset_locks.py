@@ -375,22 +375,19 @@ class AssetLocksTest(DashTestFramework):
         credit_pool_amount_1 = get_credit_pool_amount(node)
         assert_greater_than(credit_pool_amount_1, 10_500 * COIN)
         limit_amount_1 = 1000 * COIN
-        # take most of limit by one big tx for faster testing
-        amount_to_withdraw_1 = int(limit_amount_1 * 0.99)
+        # take most of limit by one big tx for faster testing and
+        # create several tiny withdrawal with exactly 1 *invalid* / causes spend above limit tx
+        amount_to_withdraw_1 = 1002 * COIN
         index = 400
-
-        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, amount_to_withdraw_1, pubkey)
-        node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
-        # This should create exactly 1 *invalid* / causes spend above limit tx
-        while amount_to_withdraw_1 <= limit_amount_1:
-            amount_to_withdraw_1 += 3 * COIN
+        for next_amount in [990 * COIN, 3 * COIN, 3 * COIN, 3 * COIN, 3 * COIN]:
             index += 1
-            asset_unlock_tx = create_assetunlock(node, self.mninfo, index, COIN, pubkey)
+            asset_unlock_tx = create_assetunlock(node, self.mninfo, index, next_amount, pubkey)
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
         node.generate(1)
         self.sync_all()
         new_total = get_credit_pool_amount(node)
         amount_actually_withdrawn = total - new_total
+        block = node.getblock(node.getbestblockhash())
         # Since we tried to withdraw more than we could
         assert_greater_than(amount_to_withdraw_1, amount_actually_withdrawn)
         # Check we tried to withdraw more than the limit
@@ -398,11 +395,17 @@ class AssetLocksTest(DashTestFramework):
         # Check we didn't actually withdraw more than allowed by the limit
         assert_greater_than_or_equal(limit_amount_1, amount_actually_withdrawn)
         assert_greater_than(1000 * COIN, amount_actually_withdrawn)
+        assert_equal(amount_actually_withdrawn, 999 * COIN)
         node.generate(1)
         self.sync_all()
+        # one tx should stay in mempool for awhile until is not invalidated by height
+        assert_equal(node.getmempoolinfo()['size'], 1)
+
         assert_equal(new_total, get_credit_pool_amount(node))
         node.generate(574) # one day: 576 blocks
         self.sync_all()
+        # but should disappear later
+        assert_equal(node.getmempoolinfo()['size'], 0)
 
         # new tx should be mined not this block, but next one
         # size of this transaction should be more than
@@ -426,12 +429,11 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
 
         # all tx should be dropped from mempool because new quorums
+        # amount of credit pool should not be changed
         node.generate(700)
         self.sync_all()
-        # amount in credit pool should be still same after many blocks, txes should be dropped from mempool
         assert_equal(new_total, get_credit_pool_amount(node))
-        # TODO FIX IT, should be 0 if mempool is cleared properly!
-        assert_equal(node.getmempoolinfo()['size'], 2)
+        assert_equal(node.getmempoolinfo()['size'], 0)
 
 if __name__ == '__main__':
     AssetLocksTest().main()

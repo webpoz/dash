@@ -21,6 +21,7 @@
 
 #include <bls/bls.h>
 #include <evo/specialtx.h>
+#include <evo/assetlocktx.h>
 #include <evo/providertx.h>
 #include <evo/deterministicmns.h>
 #include <llmq/instantsend.h>
@@ -456,6 +457,11 @@ void CTxMemPool::addUnchecked(const CTxMemPoolEntry &entry, setEntries &setAnces
         if (dmn->pdmnState->pubKeyOperator.Get() != CBLSPublicKey()) {
             newit->isKeyChangeProTx = true;
         }
+    } else if (tx.nType == TRANSACTION_ASSET_UNLOCK) {
+        CAssetUnlockPayload assetUnlockTx;
+        bool ok = GetTxPayload(tx, assetUnlockTx);
+        assert(ok);
+        mapAssetUnlockExpiry.insert({tx.GetHash(), CAssetUnlockPayload::heightToRefuse(assetUnlockTx.getRequestedHeight())});
     }
 }
 
@@ -677,7 +683,11 @@ void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
             assert(false);
         }
         eraseProTxRef(proTx.proTxHash, it->GetTx().GetHash());
+    } else if (it->GetTx().nType == TRANSACTION_ASSET_UNLOCK) {
+//        removeRecursive();
+        mapAssetUnlockExpiry.erase(it->GetTx().GetHash());
     }
+
 
     totalTxSize -= it->GetTxSize();
     cachedInnerUsage -= it->DynamicMemoryUsage();
@@ -993,6 +1003,53 @@ void CTxMemPool::removeForBlock(const std::vector<CTransactionRef>& vtx, unsigne
     }
     lastRollingFeeUpdate = GetTime();
     blockSinceLastRollingFeeBump = true;
+}
+
+/**
+ * --------
+ */
+void CTxMemPool::removeExpiredAssetUnlock(unsigned int nBlockHeight)
+{
+    AssertLockHeld(cs);
+//    std::vector<const CTxMemPoolEntry*> entries;
+    std::vector<CTransactionRef> entries;
+    for (const auto& item: mapAssetUnlockExpiry) {
+        if (item.second < nBlockHeight) {
+            entries.push_back(get(item.first));
+        }
+    }
+    /*
+    for (const auto& tx : vtx)
+    {
+        uint256 hash = tx->GetHash();
+
+        const auto i = mapAssetUnlockExpiry.find(hash);
+        if (i != mapAssetUnlockExpiry.end() && i->second >= nBlockHeight) {
+            entries.push_back(tx);
+//            entries.push_back(&*i);
+        }
+    } */
+    for (const auto& tx : entries) {
+        removeRecursive(*tx, MemPoolRemovalReason::EXPIRY);
+    }
+
+        /*
+    if (minerPolicyEstimator) {minerPolicyEstimator->processBlock(nBlockHeight, entries);}
+    for (const auto& tx : vtx)
+    {
+        txiter it = mapTx.find(tx->GetHash());
+        if (it != mapTx.end()) {
+            setEntries stage;
+            stage.insert(it);
+            RemoveStaged(stage, true, MemPoolRemovalReason::EXPIRY);
+        }
+        removeConflicts(*tx);
+        removeProTxConflicts(*tx);
+        ClearPrioritisation(tx->GetHash());
+    }
+    lastRollingFeeUpdate = GetTime();
+    blockSinceLastRollingFeeBump = true;
+    */
 }
 
 void CTxMemPool::_clear()

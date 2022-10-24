@@ -130,6 +130,8 @@ public:
     uint32_t getRequestedHeight() const;
     uint256 getQuorumHash() const;
     CBLSSignature getQuorumSig() const;
+
+    static int heightToRefuse(int requestedHeight);
 };
 
 maybe_error CheckAssetLockTx(const CTransaction& tx);

@@ -107,6 +107,18 @@ const std::vector<CTxOut>& CAssetLockPayload::getCreditOutputs() const {
     return creditOutputs;
 }
 
+int CAssetUnlockPayload::heightToRefuse(int requestedHeight) {
+    Consensus::LLMQType llmqType = Params().GetConsensus().llmqTypeAssetLocks;
+
+    if (!Params().HasLLMQ(llmqType)) {
+//        return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-llmq-type"};
+        return -1;
+    }
+
+    int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
+    return requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1;
+}
+
 /*
    Asset Unlock Transaction (withdrawals)
    */
@@ -130,6 +142,16 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     std::vector<uint8_t> vchHash(32);
     CSHA256().Write(reinterpret_cast<const uint8_t*>(id.data()), id.size()).Finalize(vchHash.data());
     uint256 requestId(vchHash);
+
+    // The quorum that signed the asset unlock MUST be in the mnlist at the requestedHeight, otherwise the asset
+    // TODO this needs to be changed to specificly check the signature against the quorumHash in this asset unlock.
+    // That quourm hash must be active at `requestHeight`, and at the quorumHash must be active in either the current or previous quorum cycle
+    // and the sig must validate against that specific quorumHash.
+
+    //                                                                                                                                      use the active quorum count
+    // use     std::vector<CQuorumCPtr> CQuorumManager::ScanQuorums(Consensus::LLMQType llmqType, const CBlockIndex* pindexStart, size_t nCountRequested) const
+    // do this twice, once for the tip, once for previous cycle, check it exists in one of them
+    // use     CQuorumCPtr GetQuorum(Consensus::LLMQType llmqType, const uint256& quorumHash) const;
 
     // We check only current quorum and previous one, not further
     for (int signIter = 0; signIter < 2; ++signIter) {
