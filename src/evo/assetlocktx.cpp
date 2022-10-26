@@ -10,6 +10,7 @@
 #include <chainparams.h>
 #include <validation.h>
 
+#include <llmq/commitment.h>
 #include <llmq/signing.h>
 #include <llmq/utils.h>
 #include <llmq/quorums.h>
@@ -122,7 +123,7 @@ int CAssetUnlockPayload::heightToRefuse(int requestedHeight) {
 /*
    Asset Unlock Transaction (withdrawals)
    */
-maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) const
+maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height, const CBlockIndex* pindexTip, const uint256 quorumHash) const
 {
     Consensus::LLMQType llmqType = Params().GetConsensus().llmqTypeAssetLocks;
 
@@ -131,11 +132,8 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     }
 
     int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
-    if (height < requestedHeight || height >= (requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1)) {
-        LogPrintf("Asset unlock tx %d with requested height %d could not be accepted on height: %d\n",
-                index, requestedHeight, height);
-        return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
-    }
+    /*
+    */
 
     const std::string id(strprintf("plwdtx%lld", index));
 
@@ -143,6 +141,23 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     CSHA256().Write(reinterpret_cast<const uint8_t*>(id.data()), id.size()).Finalize(vchHash.data());
     uint256 requestId(vchHash);
 
+
+//    const auto& llmq_params = llmq::GetLLMQParams(type);
+    const auto& llmq_params = llmq::GetLLMQParams(llmqType);
+
+    LogPrintf("message quorum: %s\n", quorumHash.ToString());
+    int count = 2;
+    auto quorums = llmq::quorumManager->ScanQuorums(llmqType, pindexTip, count > -1 ? count : llmq_params.signingActiveQuorumCount);
+    bool isActive = false;
+    for (auto& q : quorums) {
+        LogPrintf("Active quorum: %s\n", q->qc->quorumHash.ToString());
+        if (q->qc->quorumHash == quorumHash) {
+            isActive = true;
+        }
+    }
+    if (!isActive) {
+        return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-not-active-quorum"};
+    }
     // The quorum that signed the asset unlock MUST be in the mnlist at the requestedHeight, otherwise the asset
     // TODO this needs to be changed to specificly check the signature against the quorumHash in this asset unlock.
     // That quourm hash must be active at `requestHeight`, and at the quorumHash must be active in either the current or previous quorum cycle
@@ -153,12 +168,31 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     // do this twice, once for the tip, once for previous cycle, check it exists in one of them
     // use     CQuorumCPtr GetQuorum(Consensus::LLMQType llmqType, const uint256& quorumHash) const;
 
+    if (height < requestedHeight || height >= (requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1)) {
+        LogPrintf("Asset unlock tx %d with requested height %d could not be accepted on height: %d\n",
+                index, requestedHeight, height);
+        return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
+    }
+
+    auto quorum = llmq::quorumManager->GetQuorum(llmqType, quorumHash);
+    if (!quorum) {
+        // should not happen
+        throw std::runtime_error("quorum wtf dosn't exist");
+    }
+
+    uint256 signHash = llmq::utils::BuildSignHash(llmqType, quorum->qc->quorumHash, requestId, msgHash);
+    if (quorumSig.VerifyInsecure(quorum->qc->quorumPublicKey, signHash)) {
+        return {};
+    }
+
+    /*
     // We check only current quorum and previous one, not further
     for (int signIter = 0; signIter < 2; ++signIter) {
         if (llmq::CSigningManager::VerifyRecoveredSig(llmqType, *llmq::quorumManager, getRequestedHeight(), requestId, msgHash, quorumSig, signIter * signOffset)) {
             return {};
         }
     }
+    */
 
     return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-not-verified"};
 }
@@ -194,10 +228,12 @@ maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindex
     if (!pindexQuorum) {
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-quorum-hash"};
     }
+    /*
     if (pindexQuorum != pindexPrev->GetAncestor(pindexQuorum->nHeight)) {
         // not part of active chain
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-quorum-hash-q"};
     }
+    */
 
 
     // Copy transaction except `quorumSig` field to calculate hash
@@ -206,7 +242,7 @@ maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindex
     SetTxPayload(tx_copy, payload_copy);
 
     uint256 msgHash = tx_copy.GetHash();
-    return assetUnlockTx.VerifySig(msgHash, pindexPrev->nHeight);
+    return assetUnlockTx.VerifySig(msgHash, pindexPrev->nHeight, pindexPrev, assetUnlockTx.getQuorumHash());
 }
 
 std::string CAssetUnlockPayload::ToString() const

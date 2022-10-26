@@ -222,6 +222,7 @@ class AssetLocksTest(DashTestFramework):
         asset_unlock_tx = create_assetunlock(node, self.mninfo, 101, COIN, pubkey)
         asset_unlock_tx_late = create_assetunlock(node, self.mninfo, 102, COIN, pubkey)
         asset_unlock_tx_too_late = create_assetunlock(node, self.mninfo, 103, COIN, pubkey)
+        asset_unlock_tx_inactive_quorum = create_assetunlock(node, self.mninfo, 104, COIN, pubkey)
 
         self.check_mempool_result(
             result_expected=[{'txid': asset_unlock_tx.rehash(), 'allowed': True }],
@@ -255,7 +256,7 @@ class AssetLocksTest(DashTestFramework):
         block_asset_unlock = node.getbestblockhash()
 
         # mine next quorum, tx should be still accepted
-        if False:
+        if True:
             self.mine_quorum()
         # should stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
@@ -271,23 +272,28 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
 
+        # generate many blocks to make quorum far behind (even still active)
+        node.generate(100)
+        self.sync_all()
+        self.check_mempool_result(
+            result_expected=[{'txid': asset_unlock_tx_too_late.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'}],
+            rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
+        )
+
         # two quorums later is too late
-        if False:
+        if True:
             self.mine_quorum()
             self.check_mempool_result(
-                result_expected=[{'txid': asset_unlock_tx_too_late.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'}],
-                rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
+                result_expected=[{'txid': asset_unlock_tx_inactive_quorum.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-active-quorum'}],
+                rawtxs=[asset_unlock_tx_inactive_quorum.serialize().hex()],
             )
-        else:
-            node.generate(20)
-            self.sync_all()
 
         self.log.info("Test block invalidation with asset unlock tx...")
         for inode in self.nodes:
             inode.invalidateblock(block_asset_unlock)
         assert_equal(get_credit_pool_amount(node), locked_1)
         # generate some new blocks
-        node.generate(3)
+        node.generate(110)
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), locked_1)
         for inode in self.nodes:
@@ -295,7 +301,7 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
 
         # ----- test manually created block
-        if True:
+        if False:
             hh = node.getbestblockhash()
             best_block = node.getblock(hh)
             tip = int(node.getbestblockhash(), 16)
@@ -368,6 +374,8 @@ class AssetLocksTest(DashTestFramework):
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
         node.generate(13)
         self.sync_all()
+        print("credit-pool: ")
+        print(get_credit_pool_amount(node))
         # Check the tx didn't get mined
         try:
             node.gettransaction(txid_in_block)

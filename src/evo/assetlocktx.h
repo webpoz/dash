@@ -120,7 +120,7 @@ public:
         obj.pushKV("quorumSig", quorumSig.ToString());
     }
 
-    maybe_error VerifySig(const uint256& msgHash, int height) const;
+    maybe_error VerifySig(const uint256& msgHash, int height, const CBlockIndex* pindexTip, uint256 quorumHash) const;
 
     // getters
     uint16_t getVersion() const;
