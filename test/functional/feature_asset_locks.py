@@ -22,6 +22,7 @@ from test_framework.messages import (
     COIN,
     CTransaction,
     ToHex,
+    CBlock,
 )
 from test_framework.script import (
     hash160,
@@ -250,24 +251,12 @@ class AssetLocksTest(DashTestFramework):
         # check asset pool amount again
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
 
-        self.log.info("Test block invalidation with asset unlock tx...")
+        # safe block for further test of invalidation/reconsideration
         block_asset_unlock = node.getbestblockhash()
-        # TODO knst does not work
-        #node.generate(1)
-        #self.sync_all()
-
-        for inode in self.nodes:
-            inode.invalidateblock(block_asset_unlock)
-        assert_equal(get_credit_pool_amount(node), locked_1)
-        # TODO knst: strange, still fails if generate there new blocks
-        #node.generate(3)
-        #self.sync_all()
-        for inode in self.nodes:
-            inode.reconsiderblock(block_asset_unlock)
-        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
 
         # mine next quorum, tx should be still accepted
-        self.mine_quorum()
+        if False:
+            self.mine_quorum()
         # should stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
 
@@ -283,21 +272,61 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
 
         # two quorums later is too late
-        self.mine_quorum()
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_too_late.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'}],
-            rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
-        )
+        if False:
+            self.mine_quorum()
+            self.check_mempool_result(
+                result_expected=[{'txid': asset_unlock_tx_too_late.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'}],
+                rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
+            )
+        else:
+            node.generate(20)
+            self.sync_all()
+
+        self.log.info("Test block invalidation with asset unlock tx...")
+        for inode in self.nodes:
+            inode.invalidateblock(block_asset_unlock)
+        assert_equal(get_credit_pool_amount(node), locked_1)
+        # generate some new blocks
+        node.generate(3)
+        self.sync_all()
+        assert_equal(get_credit_pool_amount(node), locked_1)
+        for inode in self.nodes:
+            inode.reconsiderblock(block_asset_unlock)
+        assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
 
         # ----- test manually created block
-        if False:
-            best_block = node.getblock(node.getbestblockhash())
+        if True:
+            hh = node.getbestblockhash()
+            best_block = node.getblock(hh)
             tip = int(node.getbestblockhash(), 16)
             height = best_block["height"] + 1
             block_time = best_block["time"] + 1
 
 
-            block = create_block(tip, create_coinbase(height), block_time)
+            cbb = create_coinbase(height)
+            cbb.rehash()
+            print("coinbase:")
+            print(cbb)
+#            print(create_coinbase(height))
+#            print(create_coinbase(height - 1))
+            block = CBlock()
+            block.nVersion = 3
+            block.hashPrevBlock = int(hh, 16)
+            block.nTime = best_block["time"] + 1
+            tmpl = node.getblocktemplate()
+            block.nBits = int(tmpl["bits"], 16)
+            block.nNonce = 0
+            block.vtx = [cbb]
+            block.solve()
+            result_a = node.submitblock(hexdata=block.serialize().hex())
+            print(f'result : {result_a}')
+
+
+
+
+            block = create_block(tip, cbb, block_time, version=3)
+            print("block:")
+            print(block)
             # Forcibly mine asset_unlock_tx_too_late and ensure block is invalid
             # see https://github.com/dashpay/dash/blob/6dbc9aba0d37c677be9c091112654963a77b3a97/test/functional/feature_dip3_deterministicmns.py#L428-L434
             print("block txes")
@@ -306,11 +335,14 @@ class AssetLocksTest(DashTestFramework):
             block.vtx.append(asset_unlock_tx_too_late)
             print(block.vtx)
             block.hashMerkleRoot = block.calc_merkle_root()
+            block.rehash()
             block.solve()
-            result = node.submitblock(ToHex(block))
+            result = node.submitblock(block.serialize().hex())
+#            result = node.send_blocks([block])
             print("result:")
             print(result)
             # Expect an error here
+            expected_error = None
             if expected_error is not None and result != expected_error:
                 raise AssertionError('mining the block should have failed with error %s, but submitblock returned %s' % (expected_error, result))
             elif expected_error is None and result is not None:
