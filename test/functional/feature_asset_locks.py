@@ -167,16 +167,24 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), 0)
         txid_in_block = node.sendrawtransaction(hexstring=asset_lock_tx.serialize().hex(), maxfeerate=0)
 
-        node.generate(13)
+        self.sync_mempools()
+        assert_equal(get_credit_pool_amount(node), 0)
+
+        node.generate(1)
+        assert_equal(get_credit_pool_amount(node), locked_1)
+        # Generate a number of blocks to ensure this is the longest chain for later in the test when we reconsiderblock
+        node.generate(12)
         self.sync_all()
 
         assert_equal(get_credit_pool_amount(node), locked_1)
+        assert_equal(get_credit_pool_amount(self.nodes[1]), locked_1)
 
         # tx is mined, let's get blockhash
         self.log.info("Invalidate block with asset lock tx...")
         block_hash_1 = node.gettransaction(txid_in_block)['blockhash']
         for inode in self.nodes:
             inode.invalidateblock(block_hash_1)
+            assert_equal(get_credit_pool_amount(inode), 0)
         node.generate(3)
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), 0)
@@ -243,10 +251,18 @@ class AssetLocksTest(DashTestFramework):
 
         # mine next quorum, tx should be still accepted
         self.mine_quorum()
+        # should stay same
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         self.check_mempool_result(
             result_expected=[{'txid': asset_unlock_tx_late.rehash(), 'allowed': True }],
             rawtxs=[asset_unlock_tx_late.serialize().hex()],
         )
+        # should still stay same
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
+        node.sendrawtransaction(hexstring=asset_unlock_tx_late.serialize().hex(), maxfeerate=0)
+        node.generate(1)
+        self.sync_all()
+        assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
 
         # generate many blocks to make quorum far behind (even still active)
         node.generate(100)
@@ -267,7 +283,7 @@ class AssetLocksTest(DashTestFramework):
         node.generate(13)
         self.sync_all()
 
-        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
+        assert_equal(get_credit_pool_amount(node), locked_1 -  2 * COIN)
         assert_equal(get_credit_pool_amount(node, block_hash_1), locked_1)
 
         # too big withdrawal should not be mined
@@ -298,8 +314,11 @@ class AssetLocksTest(DashTestFramework):
         )
 
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
-        node.generate(13)
+        node.generate(1)
         self.sync_all()
+        # check txid_in_block was mined
+        block = node.getblock(node.getbestblockhash())
+        assert txid_in_block in block['tx']
         assert_equal(get_credit_pool_amount(node), 0)
 
         # test withdrawal limits
