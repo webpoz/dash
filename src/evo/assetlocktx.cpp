@@ -118,8 +118,7 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-llmq-type"};
     }
 
-    int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
-    if (height < requestedHeight || height >= (requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1)) {
+    if (height < requestedHeight || height >= getHeightToExpiry()) {
         LogPrintf("Asset unlock tx %d with requested height %d could not be accepted on height: %d\n",
                 index, requestedHeight, height);
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-too-late"};
@@ -132,6 +131,7 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, int height) c
     uint256 requestId(vchHash);
 
     // We check only current quorum and previous one, not further
+    int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
     for (int signIter = 0; signIter < 2; ++signIter) {
         if (llmq::CSigningManager::VerifyRecoveredSig(llmqType, *llmq::quorumManager, getRequestedHeight(), requestId, msgHash, quorumSig, signIter * signOffset)) {
             return {};
@@ -215,4 +215,14 @@ uint256 CAssetUnlockPayload::getQuorumHash() const {
 
 CBLSSignature CAssetUnlockPayload::getQuorumSig() const {
     return quorumSig;
+}
+
+int CAssetUnlockPayload::getHeightToExpiry() const {
+    Consensus::LLMQType llmqType = Params().GetConsensus().llmqTypeAssetLocks;
+
+    assert(Params().HasLLMQ(llmqType));
+
+    int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
+    // round up withing current and next quorum
+    return requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1;
 }

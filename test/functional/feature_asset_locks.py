@@ -337,12 +337,12 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         new_total -= COIN
         assert_equal(new_total, get_credit_pool_amount(node))
-        # all tx should be dropped from mempool because new quorums
+
+        # all tx should be dropped from mempool because too far
+        # but amount in credit pool should be still same after many blocks
         node.generate(700)
         self.sync_all()
-        # amount in credit pool should be still same after many blocks, txes should be dropped from mempool
         assert_equal(new_total, get_credit_pool_amount(node))
-        # TODO FIX IT, should be 0 if mempool is cleared properly!
-        assert_equal(node.getmempoolinfo()['size'], 2)
+        assert_equal(node.getmempoolinfo()['size'], 0)
 if __name__ == '__main__':
     AssetLocksTest().main()
