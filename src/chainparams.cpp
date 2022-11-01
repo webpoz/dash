@@ -565,7 +565,6 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_50_60;
-        // TODO or which one?
         consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_50_60;
 
         fDefaultConsistencyChecks = false;
@@ -789,7 +788,6 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_50_60;
-        // TODO or which one?
         consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_50_60;
 
         UpdateDevnetLLMQChainLocksFromArgs(args);
