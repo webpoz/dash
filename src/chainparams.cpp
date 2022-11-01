@@ -317,6 +317,8 @@ public:
         consensus.llmqTypeDIP0024InstantSend = Consensus::LLMQType::LLMQ_60_75;
         consensus.llmqTypePlatform = Consensus::LLMQType::LLMQ_100_67;
         consensus.llmqTypeMnhf = Consensus::LLMQType::LLMQ_400_85;
+        //  .dkgInterval = 24 * 24, // one DKG every 24 hours
+        // need to change to 2 hours (48 blocks) if follow updates in DIP
         consensus.llmqTypeAssetLocks = Consensus::LLMQType::LLMQ_400_85;
 
         fDefaultConsistencyChecks = false;
