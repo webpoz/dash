@@ -11,6 +11,7 @@ from io import BytesIO
 from test_framework.blocktools import (
     create_block,
     create_coinbase,
+    create_tx_with_script,
 )
 from test_framework.authproxy import JSONRPCException
 from test_framework.key import ECKey
@@ -32,6 +33,8 @@ from test_framework.script import (
     OP_CHECKSIG,
     OP_DUP,
     OP_EQUALVERIFY,
+    SIGHASH_ALL,
+    SignatureHash,
 )
 from test_framework.test_framework import DashTestFramework
 from test_framework.util import (
@@ -122,6 +125,11 @@ def get_credit_pool_amount(node, block_hash = None):
     return int(COIN * block['cbTx']['assetLockedAmount'])
 
 class AssetLocksTest(DashTestFramework):
+    def sign_tx(self, tx, spend_tx):
+        scriptPubKey = bytearray(spend_tx.vout[0].scriptPubKey)
+        (sighash, err) = SignatureHash(spend_tx.vout[0].scriptPubKey, tx, 0, SIGHASH_ALL)
+        tx.vin[0].scriptSig = CScript([self.coinbase_key.sign_ecdsa(sighash) + bytes(bytearray([SIGHASH_ALL]))])
+
     def set_test_params(self):
         self.set_dash_test_params(4, 3)
 
@@ -157,6 +165,7 @@ class AssetLocksTest(DashTestFramework):
         key = ECKey()
         key.generate()
         pubkey = key.get_pubkey().get_bytes()
+        self.coinbase_key = key
 
         self.log.info("Testing asset lock...")
         coins = node.listunspent()
@@ -237,15 +246,41 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(asset_unlock_tx_payload.quorumHash, int(self.mninfo[0].node.quorum("selectquorum", llmq_type_test, 'e6c7a809d79f78ea85b72d5df7e9bd592aecf151e679d6e976b74f053a7f9056')["quorumHash"], 16))
 
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+
+
+        # spending of asset-unlock testing
+        spending_1 = create_tx_with_script(asset_unlock_tx, 0, amount=int(COIN * Decimal("0.98")), script_pub_key=CScript([pubkey, OP_CHECKSIG]) )
+        self.sign_tx(spending_1, asset_unlock_tx)
+        spending_1.rehash()
+
+        self.mempool_size += 1
+        self.check_mempool_result(
+            result_expected=[{'txid': spending_1.rehash(), 'allowed': True}],
+            rawtxs=[spending_1.serialize().hex()],
+        )
+        spending_1_tx = node.sendrawtransaction(hexstring=spending_1.serialize().hex(), maxfeerate=0)
+        # -----
         node.generate(1)
         self.sync_all()
+        self.mempool_size -= 1
+        assert_equal(node.getmempoolinfo()['size'], 0)
+
+        # safe block for further test of invalidation/reconsideration
+        block_asset_unlock = node.getbestblockhash()
+
+        #----
+        assert_equal(block_asset_unlock, node.gettransaction(spending_1_tx)['blockhash'])
+
+        # check asset pool amount after unlock
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         try:
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
             raise AssertionError("Transaction should not be mined: double copy")
         except JSONRPCException as e:
             assert "Transaction already in block chain" in e.error['message']
 
-        block_asset_unlock = node.getbestblockhash()
+        # check asset pool amount again
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
 
         # mine next quorum, tx should be still accepted
         self.mine_quorum()
