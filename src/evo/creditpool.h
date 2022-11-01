@@ -35,7 +35,8 @@ private:
     bool unlock(const CTransaction& tx, CValidationState& state);
 
     static constexpr int LimitBlocksToTrace = 576;
-    static constexpr CAmount LimitAmount = 1000 * COIN;
+    static constexpr CAmount LimitAmountLow = 100 * COIN;
+    static constexpr CAmount LimitAmountHigh = 1000 * COIN;
 public:
     CCreditPoolManager(CBlockIndex* pindexPrev, const Consensus::Params& consensusParams);
 
