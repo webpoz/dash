@@ -272,6 +272,9 @@ class AssetLocksTest(DashTestFramework):
 
         # too big withdrawal should not be mined
         aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 201, 1 + get_credit_pool_amount(node), pubkey)
+
+        # Mempool doesn't know about the size of the credit pool, so the transaction will be accepted to mempool,
+        # but won't be mined
         self.check_mempool_result(
             result_expected=[{'txid': aset_unlock_tx_full.rehash(), 'allowed': True }],
             rawtxs=[aset_unlock_tx_full.serialize().hex()],
@@ -280,6 +283,7 @@ class AssetLocksTest(DashTestFramework):
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
         node.generate(13)
         self.sync_all()
+        # Check the tx didn't get mined
         try:
             node.gettransaction(txid_in_block)
             raise AssertionError("Transaction should not be mined")
@@ -304,7 +308,7 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         self.mine_quorum()
         total = get_credit_pool_amount(node)
-        while total <= 11_000 * COIN:
+        while total <= 10_500 * COIN:
             coin = coins.pop()
             to_lock = int(coin['amount'] * COIN) - tiny_amount
             total += to_lock
@@ -312,43 +316,63 @@ class AssetLocksTest(DashTestFramework):
             node.sendrawtransaction(hexstring=tx.serialize().hex(), maxfeerate=0)
         node.generate(1)
         self.sync_all()
-        amount_to_withdraw = get_credit_pool_amount(node)
-        assert_greater_than(amount_to_withdraw, 11_000 * COIN)
-        amount_under_limit = amount_to_withdraw // 10
-        amount = int(amount_under_limit * 0.99)
+        credit_pool_amount_1 = get_credit_pool_amount(node)
+        assert_greater_than(credit_pool_amount_1, 10_500 * COIN)
+        limit_amount_1 = 1000 * COIN
+        # take most of limit by one big tx for faster testing and
+        # create several tiny withdrawal with exactly 1 *invalid* / causes spend above limit tx
+        amount_to_withdraw_1 = 1002 * COIN
         index = 400
-
-        # take most of limit by one big tx for faster testing
-        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, amount, pubkey)
-        node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
-        while amount < amount_under_limit:
-            amount += COIN
+        for next_amount in [990 * COIN, 3 * COIN, 3 * COIN, 3 * COIN, 3 * COIN]:
             index += 1
-            asset_unlock_tx = create_assetunlock(node, self.mninfo, index, COIN, pubkey)
+            asset_unlock_tx = create_assetunlock(node, self.mninfo, index, next_amount, pubkey)
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+            if index == 401:
+                node.generate(1)
         node.generate(1)
         self.sync_all()
         new_total = get_credit_pool_amount(node)
-        assert_greater_than(amount, amount_under_limit)
-        assert_greater_than_or_equal(amount_under_limit, total - new_total)
-        assert_greater_than(total - new_total, 1000)
+        amount_actually_withdrawn = total - new_total
+        block = node.getblock(node.getbestblockhash())
+        # Since we tried to withdraw more than we could
+        assert_greater_than(amount_to_withdraw_1, amount_actually_withdrawn)
+        # Check we tried to withdraw more than the limit
+        assert_greater_than(amount_to_withdraw_1, limit_amount_1)
+        # Check we didn't actually withdraw more than allowed by the limit
+        assert_greater_than_or_equal(limit_amount_1, amount_actually_withdrawn)
+        assert_greater_than(1000 * COIN, amount_actually_withdrawn)
+        assert_equal(amount_actually_withdrawn, 999 * COIN)
         node.generate(1)
         self.sync_all()
+        # one tx should stay in mempool for awhile until is not invalidated by height
+        assert_equal(node.getmempoolinfo()['size'], 1)
+
         assert_equal(new_total, get_credit_pool_amount(node))
         node.generate(574) # one day: 576 blocks
         self.sync_all()
+        # but should disappear later
+        assert_equal(node.getmempoolinfo()['size'], 0)
 
         # new tx should be mined not this block, but next one
+        # size of this transaction should be more than
+        credit_pool_amount_2 = get_credit_pool_amount(node)
+        limit_amount_2 = credit_pool_amount_2 // 10
         index += 1
-        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, COIN, pubkey)
+        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, limit_amount_2, pubkey)
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
         node.generate(1)
         self.sync_all()
         assert_equal(new_total, get_credit_pool_amount(node))
         node.generate(1)
         self.sync_all()
-        new_total -= COIN
+        new_total -= limit_amount_2
         assert_equal(new_total, get_credit_pool_amount(node))
+        # trying to withdraw more: should fail
+        index += 1
+        asset_unlock_tx = create_assetunlock(node, self.mninfo, index, COIN * 100, pubkey)
+        node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        node.generate(1)
+        self.sync_all()
 
         # all tx should be dropped from mempool because too far
         # but amount in credit pool should be still same after many blocks
