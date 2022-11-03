@@ -81,6 +81,7 @@
 #include <spork.h>
 #include <walletinitinterface.h>
 
+#include <evo/creditpool.h>
 #include <evo/deterministicmns.h>
 #include <llmq/blockprocessor.h>
 #include <llmq/chainlocks.h>
@@ -355,6 +356,7 @@ void PrepareShutdown(NodeContext& node)
         }
         llmq::quorumSnapshotManager.reset();
         deterministicMNManager.reset();
+        creditPoolManager.reset();
         node.evodb.reset();
     }
     for (const auto& client : node.chain_clients) {
@@ -2034,6 +2036,8 @@ bool AppInitMain(const CoreContext& context, NodeContext& node, interfaces::Bloc
                 // Same logic as above with pblocktree
                 deterministicMNManager.reset();
                 deterministicMNManager.reset(new CDeterministicMNManager(*node.evodb, *node.connman));
+                creditPoolManager.reset();
+                creditPoolManager.reset(new CCreditPoolManager(*node.evodb));
                 llmq::quorumSnapshotManager.reset();
                 llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*node.evodb));
                 node.llmq_ctx.reset();
