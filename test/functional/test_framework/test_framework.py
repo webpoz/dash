@@ -893,10 +893,10 @@ class DashTestFramework(BitcoinTestFramework):
                 self.sync_blocks()
         self.sync_blocks()
 
-    def activate_dip0024(self, expected_activation_height=None):
-        self.log.info("Wait for dip0024 activation")
+    def activate_by_name(self, name, expected_activation_height=None):
+        self.log.info("Wait for " + name + " activation")
 
-        # disable spork17 while mining blocks to activate dip0024 to prevent accidental quorum formation
+        # disable spork17 while mining blocks to activate feature to prevent accidental quorum formation
         spork17_value = self.nodes[0].spork('show')['SPORK_17_QUORUM_DKG_ENABLED']
         self.bump_mocktime(1)
         self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", 4070908800)
@@ -916,9 +916,9 @@ class DashTestFramework(BitcoinTestFramework):
             self.bump_mocktime(blocks_left)
             self.nodes[0].generate(blocks_left)
             self.sync_blocks()
-            assert self.nodes[0].getblockchaininfo()['bip9_softforks']['dip0024']['status'] != 'active'
+            assert self.nodes[0].getblockchaininfo()['bip9_softforks'][name]['status'] != 'active'
 
-        while self.nodes[0].getblockchaininfo()['bip9_softforks']['dip0024']['status'] != 'active':
+        while self.nodes[0].getblockchaininfo()['bip9_softforks'][name]['status'] != 'active':
             self.bump_mocktime(batch_size)
             self.nodes[0].generate(batch_size)
             self.sync_blocks()
@@ -929,30 +929,11 @@ class DashTestFramework(BitcoinTestFramework):
         self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", spork17_value)
         self.wait_for_sporks_same()
 
+    def activate_dip0024(self, expected_activation_height=None):
+        self.activate_by_name('dip0024', expected_activation_height)
+
     def activate_v19(self, expected_activation_height=None):
-        self.log.info("Wait for v19 activation")
-
-        # mine blocks in batches
-        batch_size = 30
-        if expected_activation_height is not None:
-            height = self.nodes[0].getblockcount()
-            while height - expected_activation_height > batch_size:
-                self.bump_mocktime(batch_size)
-                self.nodes[0].generate(batch_size)
-                height += batch_size
-                self.sync_blocks()
-            assert height - expected_activation_height < batch_size
-            blocks_left = height - expected_activation_height - 1
-            self.bump_mocktime(blocks_left)
-            self.nodes[0].generate(blocks_left)
-            self.sync_blocks()
-            assert self.nodes[0].getblockchaininfo()['bip9_softforks']['v19']['status'] != 'active'
-
-        while self.nodes[0].getblockchaininfo()['bip9_softforks']['v19']['status'] != 'active':
-            self.bump_mocktime(batch_size)
-            self.nodes[0].generate(batch_size)
-            self.sync_blocks()
-        self.sync_blocks()
+        self.activate_by_name('v19', expected_activation_height)
 
     def set_dash_llmq_test_params(self, llmq_size, llmq_threshold):
         self.llmq_size = llmq_size
