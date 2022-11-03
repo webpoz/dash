@@ -893,7 +893,7 @@ class DashTestFramework(BitcoinTestFramework):
                 self.sync_blocks()
         self.sync_blocks()
 
-    def activate_dip_by_name(self, name, slow_mode=False, expected_activation_height=None):
+    def activate_dip_by_name(self, name, expected_activation_height=None):
         self.log.info("Wait for " + name + " activation")
 
         # disable spork17 while mining blocks to activate dip0024 to prevent accidental quorum formation
@@ -929,11 +929,11 @@ class DashTestFramework(BitcoinTestFramework):
         self.nodes[0].sporkupdate("SPORK_17_QUORUM_DKG_ENABLED", spork17_value)
         self.wait_for_sporks_same()
 
-    def activate_dip0024(self, slow_mode=False, expected_activation_height=None):
-        self.activate_dip_by_name('dip0024', slow_mode, expected_activation_height)
+    def activate_dip0024(self, expected_activation_height=None):
+        self.activate_dip_by_name('dip0024', expected_activation_height)
 
-    def activate_dip0027_assetlocks(self, slow_mode=False, expected_activation_height=None):
-        self.activate_dip_by_name('dip0027-asset-locks', slow_mode, expected_activation_height)
+    def activate_dip0027_assetlocks(self, expected_activation_height=None):
+        self.activate_dip_by_name('dip0027-asset-locks', expected_activation_height)
 
     def set_dash_llmq_test_params(self, llmq_size, llmq_threshold):
         self.llmq_size = llmq_size
