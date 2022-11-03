@@ -148,8 +148,8 @@ class AssetLocksTest(DashTestFramework):
     def run_test(self):
         node = self.nodes[0]
 
-        self.activate_dip0027_assetlocks()
         self.set_sporks()
+        self.activate_dip0027_assetlocks()
 
         self.mempool_size = 0
         assert_equal(node.getmempoolinfo()['size'], self.mempool_size)
