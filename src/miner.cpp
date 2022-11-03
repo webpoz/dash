@@ -168,11 +168,17 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
 
-    std::optional<CCreditPoolManager> creditPoolManager;
+    std::optional<CreditPoolCbDiff> creditPoolDiff;
     if (fDIP0027AssetLocksActive_context) {
-        creditPoolManager.emplace(pindexPrev, Params().GetConsensus());
+        LogPrintf("credit-pool-diff stage-1\n");
+        CreditPoolCb creditPool = creditPoolManager->getCreditPool(pindexPrev, Params().GetConsensus());
+        LogPrintf("credit-pool-diff stage-2 %lld %lld %lld %llx\n",
+        creditPool.locked, creditPool.totalUnlocked,
+            creditPool.indexes.size(), creditPool.pindex);
+        creditPoolDiff.emplace(creditPool, Params().GetConsensus());
+        LogPrintf("credit-pool-diff stage-3\n");
     }
-    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolManager);
+    addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolDiff);
 
     int64_t nTime1 = GetTimeMicros();
 
@@ -205,7 +211,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
         if (fDIP0027AssetLocksActive_context) {
             cbTx.nVersion = 3;
-            cbTx.assetLockedAmount = creditPoolManager->getTotalLocked();
+            // TODO knst remove
+            LogPrintf("add total locked: %lld\n", creditPoolDiff->getTotalLocked());
+            cbTx.assetLockedAmount = creditPoolDiff->getTotalLocked();
         } else if (fDIP0008Active_context) {
             cbTx.nVersion = 2;
         } else {
@@ -376,7 +384,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolManager>& creditPoolManager)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CreditPoolCbDiff>& creditPoolDiff)
 {
     AssertLockHeld(m_mempool.cs);
 
@@ -433,10 +441,10 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
             }
         }
 
-        if (creditPoolManager) {
+        if (creditPoolDiff) {
             CValidationState state;
 
-            if (!creditPoolManager->processTransaction(iter->GetTx(), state)) {
+            if (!creditPoolDiff->processTransaction(iter->GetTx(), state)) {
                 if (fUsingModified) {
                     mapModifiedTx.get<ancestor_score>().erase(modit);
                     failedTx.insert(iter);

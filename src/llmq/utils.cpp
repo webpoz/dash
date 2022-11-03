@@ -595,7 +595,8 @@ bool IsDIP0027AssetLocksActive(const CBlockIndex* pindex)
     assert(pindex);
 
     LOCK(cs_llmq_vbc);
-    return VersionBitsState(pindex, Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS, llmq_versionbitscache) == ThresholdState::ACTIVE;
+    return (pindex->nHeight > Params().GetConsensus().DIP0008Height) &&
+        (VersionBitsState(pindex, Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0027_ASSETLOCKS, llmq_versionbitscache) == ThresholdState::ACTIVE);
 }
 
 bool IsDIP0024Active(const CBlockIndex* pindex)

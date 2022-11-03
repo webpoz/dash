@@ -119,11 +119,13 @@ bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, ll
 {
     AssertLockHeld(cs_main);
 
+    LogPrintf("apply block: %s", block.GetHash().ToString());
     try {
         static int64_t nTimeLoop = 0;
         static int64_t nTimeQuorum = 0;
         static int64_t nTimeDMN = 0;
         static int64_t nTimeMerkle = 0;
+        static int64_t nTimeIndexes = 0;
 
         int64_t nTime1 = GetTimeMicros();
 
@@ -168,6 +170,12 @@ bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, ll
         int64_t nTime5 = GetTimeMicros();
         nTimeMerkle += nTime5 - nTime4;
         LogPrint(BCLog::BENCHMARK, "        - CheckCbTxMerkleRoots: %.2fms [%.2fs]\n", 0.001 * (nTime5 - nTime4), nTimeMerkle * 0.000001);
+
+        // TODO process indexes to add a block
+        int64_t nTime6 = GetTimeMicros();
+        nTimeIndexes += nTime6 - nTime5;
+        LogPrint(BCLog::BENCHMARK, "        - Calc indexes : %.2fms [%.2fs]\n", 0.001 * (nTime6 - nTime5), nTimeIndexes * 0.000001);
+
     } catch (const std::exception& e) {
         LogPrintf("%s -- failed: %s\n", __func__, e.what());
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-procspectxsinblock");
@@ -181,6 +189,7 @@ bool UndoSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, llmq:
     AssertLockHeld(cs_main);
 
     try {
+        LogPrintf("undo block: %s", block.GetHash().ToString());
         for (int i = (int)block.vtx.size() - 1; i >= 0; --i) {
             const CTransaction& tx = *block.vtx[i];
             if (!UndoSpecialTx(tx, pindex)) {
@@ -195,6 +204,7 @@ bool UndoSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, llmq:
         if (!quorum_block_processor.UndoBlock(block, pindex)) {
             return false;
         }
+        // process to add indexes
     } catch (const std::exception& e) {
         return error(strprintf("%s -- failed: %s\n", __func__, e.what()).c_str());
     }

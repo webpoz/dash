@@ -70,6 +70,7 @@ def create_assetlock(node, coin, amount, pubkey):
 def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     def check_sigs(mninfo, id, msgHash):
         for mn in mninfo:
+            print(f'has rec sig: {llmq_type_test} {id} {msgHash}')
             if not mn.node.quorum("hasrecsig", llmq_type_test, id, msgHash):
                 return False
         return True
@@ -105,6 +106,7 @@ def create_assetunlock(node, mninfo, index, withdrawal, pubkey=None):
     msgHash = format(unlock_tx.sha256, '064x')
 
     for mn in mninfo:
+        print(f'sig: {llmq_type_test} {id} {msgHash} {quorumHash}')
         mn.node.quorum("sign", llmq_type_test, id, msgHash, quorumHash)
 
     wait_for_sigs(mninfo, id, msgHash, 5)
@@ -206,9 +208,11 @@ class AssetLocksTest(DashTestFramework):
         node.generate(3)
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), locked_2)
+        self.log.info(f"old hash: {node.getbestblockhash()}")
         self.log.info("Reconsider old blocks...")
         for inode in self.nodes:
             inode.reconsiderblock(block_hash_1)
+        self.log.info(f"new hash: {node.getbestblockhash()}")
         assert_equal(get_credit_pool_amount(node), locked_1)
         self.sync_all()
 
@@ -236,18 +240,34 @@ class AssetLocksTest(DashTestFramework):
 
         assert_equal(asset_unlock_tx_payload.quorumHash, int(self.mninfo[0].node.quorum("selectquorum", llmq_type_test, 'e6c7a809d79f78ea85b72d5df7e9bd592aecf151e679d6e976b74f053a7f9056')["quorumHash"], 16))
 
+        assert_equal(get_credit_pool_amount(node), locked_1)
+        self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']}")
+        self.log.info("why-shut send...");
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        assert_equal(get_credit_pool_amount(node), locked_1)
+        self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']}")
+        self.log.info("why-shut gen...");
         node.generate(1)
+        bbb1 = node.getblock(node.getbestblockhash())
+        self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']} all-block: {bbb1}")
+        for txx in bbb1['tx']:
+            self.log.info(f'tx: {txx} - {node.getrawtransaction(txx, 1)}')
+        self.log.info("why-shut sync-all...");
         self.sync_all()
+        self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']}")
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
+
         try:
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
             raise AssertionError("Transaction should not be mined: double copy")
         except JSONRPCException as e:
             assert "Transaction already in block chain" in e.error['message']
 
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         block_asset_unlock = node.getbestblockhash()
 
         # mine next quorum, tx should be still accepted
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         self.mine_quorum()
         # should stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
@@ -373,14 +393,28 @@ class AssetLocksTest(DashTestFramework):
         # create several tiny withdrawal with exactly 1 *invalid* / causes spend above limit tx
         amount_to_withdraw_1 = 1002 * COIN
         index = 400
+        self.log.info(f'start credits: {get_credit_pool_amount(node)}')
         for next_amount in [990 * COIN, 3 * COIN, 3 * COIN, 3 * COIN, 3 * COIN]:
             index += 1
             asset_unlock_tx = create_assetunlock(node, self.mninfo, index, next_amount, pubkey)
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
             if index == 401:
+
                 node.generate(1)
+                bbb1 = node.getblock(node.getbestblockhash())
+                self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']} all-block: {bbb1}")
+                for txx in bbb1['tx']:
+                    self.log.info(f'tx: {txx} - {node.getrawtransaction(txx, 1)}')
+
+            self.log.info(f'index: {index} amount: {next_amount} pool: {get_credit_pool_amount(node)}')
         node.generate(1)
         self.sync_all()
+
+        bbb1 = node.getblock(node.getbestblockhash())
+        self.log.info(f"hash: {node.getbestblockhash()} amount: {node.getblock(node.getbestblockhash())['cbTx']['assetLockedAmount']} all-block: {bbb1}")
+        for txx in bbb1['tx']:
+            self.log.info(f'tx: {txx} - {node.getrawtransaction(txx, 1)}')
+
         new_total = get_credit_pool_amount(node)
         amount_actually_withdrawn = total - new_total
         block = node.getblock(node.getbestblockhash())
@@ -430,5 +464,18 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         assert_equal(new_total, get_credit_pool_amount(node))
         assert_equal(node.getmempoolinfo()['size'], 0)
+
+        # let's try to make 2 unlock tx with same index
+        index += 1
+        print('Process for COIN * 2')
+        asset_unlock_tx_a = create_assetunlock(node, self.mninfo, index, COIN * 2, pubkey)
+        print('Process for COIN * 3')
+        asset_unlock_tx_b = create_assetunlock(node, self.mninfo, index, COIN * 3, pubkey)
+        node.sendrawtransaction(hexstring=asset_unlock_tx_a.serialize().hex(), maxfeerate=0)
+        node.sendrawtransaction(hexstring=asset_unlock_tx_b.serialize().hex(), maxfeerate=0)
+        node.generate(1)
+        self.sync_all()
+        print(f'new total: {new_total} get credit pool: {get_credit_pool_amount(node)}')
+
 if __name__ == '__main__':
     AssetLocksTest().main()

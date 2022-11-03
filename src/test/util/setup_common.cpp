@@ -51,6 +51,7 @@
 #include <coinjoin/coinjoin.h>
 #include <coinjoin/server.h>
 #include <evo/cbtx.h>
+#include <evo/creditpool.h>
 #include <evo/deterministicmns.h>
 #include <evo/evodb.h>
 #include <evo/specialtx.h>
@@ -132,6 +133,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName, const std::ve
     evoDb.reset(new CEvoDB(1 << 20, true, true));
     connman = std::make_unique<CConnman>(0x1337, 0x1337);
     deterministicMNManager.reset(new CDeterministicMNManager(*evoDb, *connman));
+    creditPoolManager.reset(new CCreditPoolManager(*evoDb));
     llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*evoDb));
     static bool noui_connected = false;
     if (!noui_connected) {
@@ -145,6 +147,7 @@ BasicTestingSetup::~BasicTestingSetup()
     connman.reset();
     llmq::quorumSnapshotManager.reset();
     deterministicMNManager.reset();
+    creditPoolManager.reset();
     evoDb.reset();
 
     LogInstance().DisconnectTestLogger();
@@ -206,6 +209,7 @@ TestingSetup::TestingSetup(const std::string& chainName, const std::vector<const
 #endif // ENABLE_WALLET
 
     deterministicMNManager.reset(new CDeterministicMNManager(*evoDb, *m_node.connman));
+    creditPoolManager.reset(new CCreditPoolManager(*evoDb));
     llmq::InitLLMQSystem(*evoDb, *m_node.mempool, *m_node.connman, *sporkManager, true);
 
     CValidationState state;
@@ -223,6 +227,7 @@ TestingSetup::~TestingSetup()
 {
     m_node.scheduler->stop();
     deterministicMNManager.reset();
+    creditPoolManager.reset();
     llmq::InterruptLLMQSystem();
     llmq::StopLLMQSystem();
     threadGroup.interrupt_all();

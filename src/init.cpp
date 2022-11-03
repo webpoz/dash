@@ -81,6 +81,7 @@
 #include <spork.h>
 #include <walletinitinterface.h>
 
+#include <evo/creditpool.h>
 #include <evo/deterministicmns.h>
 #include <llmq/blockprocessor.h>
 #include <llmq/chainlocks.h>
@@ -350,6 +351,7 @@ void PrepareShutdown(NodeContext& node)
         llmq::DestroyLLMQSystem();
         llmq::quorumSnapshotManager.reset();
         deterministicMNManager.reset();
+        creditPoolManager.reset();
         evoDb.reset();
     }
     for (const auto& client : node.chain_clients) {
@@ -2033,6 +2035,8 @@ bool AppInitMain(const CoreContext& context, NodeContext& node, interfaces::Bloc
                 evoDb.reset(new CEvoDB(nEvoDbCache, false, fReset || fReindexChainState));
                 deterministicMNManager.reset();
                 deterministicMNManager.reset(new CDeterministicMNManager(*evoDb, *node.connman));
+                creditPoolManager.reset();
+                creditPoolManager.reset(new CCreditPoolManager(*evoDb));
                 llmq::quorumSnapshotManager.reset();
                 llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*evoDb));
 
@@ -2172,6 +2176,8 @@ bool AppInitMain(const CoreContext& context, NodeContext& node, interfaces::Bloc
                     break;
                 }
 
+                // TODO knst
+                // upgrade db if needed for creditPoolManager?
                 for (CChainState* chainstate : chainman.GetAll()) {
                     if (!is_coinsview_empty(chainstate)) {
                         uiInterface.InitMessage(_("Verifying blocks...").translated);
@@ -2381,6 +2387,8 @@ bool AppInitMain(const CoreContext& context, NodeContext& node, interfaces::Bloc
     node.scheduler->scheduleEvery(std::bind(&CMasternodeSync::DoMaintenance, std::ref(*::masternodeSync)), 1 * 1000);
     node.scheduler->scheduleEvery(std::bind(&CMasternodeUtils::DoMaintenance, std::ref(*node.connman)), 60 * 1000);
     node.scheduler->scheduleEvery(std::bind(&CDeterministicMNManager::DoMaintenance, std::ref(*deterministicMNManager)), 10 * 1000);
+    // TODO knst
+    node.scheduler->scheduleEvery(std::bind(&CCreditPoolManager::DoMaintenance, std::ref(*creditPoolManager)), 60 * 1000);
 
     if (!fDisableGovernance) {
         node.scheduler->scheduleEvery(std::bind(&CGovernanceManager::DoMaintenance, std::ref(*::governance), std::ref(*node.connman)), 60 * 5 * 1000);
