@@ -5,6 +5,7 @@
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 import hashlib
+import copy
 from decimal import Decimal
 from io import BytesIO
 
@@ -224,10 +225,16 @@ class AssetLocksTest(DashTestFramework):
         asset_unlock_tx_late = create_assetunlock(node, self.mninfo, 102, COIN, pubkey)
         asset_unlock_tx_too_late = create_assetunlock(node, self.mninfo, 103, COIN, pubkey)
         asset_unlock_tx_inactive_quorum = create_assetunlock(node, self.mninfo, 104, COIN, pubkey)
+        asset_unlock_tx_duplicate_index = copy.deepcopy(asset_unlock_tx)
+        asset_unlock_tx_duplicate_index.vout[0].nValue += COIN
 
         self.check_mempool_result(
             result_expected=[{'txid': asset_unlock_tx.rehash(), 'allowed': True }],
             rawtxs=[asset_unlock_tx.serialize().hex()],
+        )
+        self.check_mempool_result(
+            result_expected=[{'txid': asset_unlock_tx_duplicate_index.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-verified'}],
+            rawtxs=[asset_unlock_tx_duplicate_index.serialize().hex()],
         )
 
         # validate that we calculate payload hash correctly: ask quorum forcely by message hash
@@ -236,15 +243,30 @@ class AssetLocksTest(DashTestFramework):
 
         assert_equal(asset_unlock_tx_payload.quorumHash, int(self.mninfo[0].node.quorum("selectquorum", llmq_type_test, 'e6c7a809d79f78ea85b72d5df7e9bd592aecf151e679d6e976b74f053a7f9056')["quorumHash"], 16))
 
+        assert_equal(get_credit_pool_amount(node), locked_1)
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        assert_equal(get_credit_pool_amount(node), locked_1)
         node.generate(1)
         self.sync_all()
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
+
         try:
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
             raise AssertionError("Transaction should not be mined: double copy")
         except JSONRPCException as e:
             assert "Transaction already in block chain" in e.error['message']
 
+        self.check_mempool_result(
+            result_expected=[{'txid': asset_unlock_tx_duplicate_index.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-duplicated-index'}],
+            rawtxs=[asset_unlock_tx_duplicate_index.serialize().hex()],
+        )
+        try:
+            node.sendrawtransaction(hexstring=asset_unlock_tx_duplicate_index.serialize().hex(), maxfeerate=0)
+            raise AssertionError("Transaction should not be mined: double index")
+        except JSONRPCException as e:
+            assert "bad-assetunlock-duplicated-index" in e.error['message']
+
+        assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         block_asset_unlock = node.getbestblockhash()
 
         # mine next quorum, tx should be still accepted
@@ -388,8 +410,10 @@ class AssetLocksTest(DashTestFramework):
             node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
             if index == 401:
                 node.generate(1)
+
         node.generate(1)
         self.sync_all()
+
         new_total = get_credit_pool_amount(node)
         amount_actually_withdrawn = total - new_total
         block = node.getblock(node.getbestblockhash())
@@ -438,5 +462,6 @@ class AssetLocksTest(DashTestFramework):
         self.sync_all()
         assert_equal(new_total, get_credit_pool_amount(node))
         assert_equal(node.getmempoolinfo()['size'], 0)
+
 if __name__ == '__main__':
     AssetLocksTest().main()
