@@ -4,6 +4,7 @@
 
 #include <evo/assetlocktx.h>
 #include <evo/specialtx.h>
+#include <evo/creditpool.h>
 
 #include <consensus/params.h>
 
@@ -185,6 +186,13 @@ maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindex
 
     if (assetUnlockTx.getFee() <= 0) {
         return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-assetunlocktx-negative-fee"};
+    }
+
+    { // validate index
+        CreditPoolCb creditPool = creditPoolManager->getCreditPool(pindexPrev, Params().GetConsensus());
+        if (creditPool.indexes.contains(assetUnlockTx.getIndex())) {
+            return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-duplicated-index"};
+        }
     }
 
     const CBlockIndex* pindexQuorum = WITH_LOCK(cs_main, return LookupBlockIndex(assetUnlockTx.getQuorumHash()));
