@@ -17,6 +17,9 @@
 #include <thread>
 
 #include "bls.hpp"
+
+// the define `MINSIGSTKSZ` is not a const since glibc v2.35
+#define CATCH_CONFIG_NO_POSIX_SIGNALS
 #include <catch2/catch.hpp>
 
 extern "C" {
