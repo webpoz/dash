@@ -39,18 +39,26 @@ static bool getAmountToUnlock(const CTransaction& tx, CAmount& toUnlock, int64_t
     return true;
 }
 
-void SkipSet::add(int64_t value) {
+bool SkipSet::add(int64_t value) {
     assert(!contains(value));
 
     if (auto it = skipped.find(value); it != skipped.end()) {
         skipped.erase(it);
     } else {
         assert(right <= value);
+
+        if (capacity() + value - right > capacity_limit) {
+            LogPrintf("SkipSet::add failed due to capacity exceeded: requested %lld to %lld while limit is %lld\n",
+                    value - right, capacity(), capacity_limit);
+            return false;
+        }
         for (int64_t index = right; index < value; ++index) {
-            assert(skipped.insert(index).second);
+            bool insert_ret = skipped.insert(index).second;
+            assert(insert_ret);
         }
         right = value + 1;
     }
+    return true;
 }
 
 bool SkipSet::contains(int64_t value) const {
@@ -115,7 +123,9 @@ static bool getStagingDataFromBlock(const CBlockIndex *block_index, const Consen
             throw std::runtime_error(strprintf("%s: getCreditPool failed: %s", __func__, FormatStateMessage(state)));
         }
         blockUnlocked += unlocked;
-        indexes.add(index);
+        if (!indexes.add(index)) {
+            throw std::runtime_error("failed-getcbforblock-index-exceed");
+        }
     }
     return true;
 }
@@ -222,7 +232,10 @@ bool CreditPoolCbDiff::unlock(const CTransaction& tx, CValidationState& state)
     if (pool.indexes.contains(index)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-duplicated-index");
     }
-    pool.indexes.add(index);
+    if (!pool.indexes.add(index)) {
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-getcbforblock-index-exceed");
+    }
+
     if (sessionUnlocked + toUnlock > pool.currentLimit) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unloock-too-much");
     }

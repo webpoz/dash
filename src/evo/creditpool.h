@@ -29,11 +29,9 @@ namespace Consensus
 // So far as CreditPoolCb is built only in direction from parent block to child
 // there's no need to remove elements from SkipSet ever, only add them
 struct SkipSet {
-    SERIALIZE_METHODS(SkipSet, obj)
-    {
-        READWRITE(obj.right);
-        READWRITE(obj.skipped);
-    }
+    explicit SkipSet(size_t capacity_limit = 10'000)
+        : capacity_limit(capacity_limit) {}
+
     [[nodiscard]] bool add(int64_t value);
 
     bool contains(int64_t value) const;
@@ -44,9 +42,16 @@ struct SkipSet {
     size_t capacity() const {
         return skipped.size();
     }
+
+    SERIALIZE_METHODS(SkipSet, obj)
+    {
+        READWRITE(obj.right);
+        READWRITE(obj.skipped);
+    }
 private:
     std::unordered_set<int64_t> skipped;
     int64_t right{0};
+    size_t capacity_limit;
 };
 
 struct CreditPoolCb {
