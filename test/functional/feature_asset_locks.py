@@ -129,11 +129,13 @@ class AssetLocksTest(DashTestFramework):
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
 
-# TODO remove duplicated function `check_mempool_result` with mempool_accept.py
-    def check_mempool_result(self, result_expected, *args, **kwargs):
+    def check_mempool_result(self, result_expected, tx):
         """Wrapper to check result of testmempoolaccept on node_0's mempool"""
-        result_test = self.nodes[0].testmempoolaccept(*args, **kwargs)
-        assert_equal(result_expected, result_test)
+        result_expected['txid'] = tx.rehash()
+
+        result_test = self.nodes[0].testmempoolaccept([tx.serialize().hex()])
+
+        assert_equal([result_expected], result_test)
         assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
 
     def set_sporks(self):
@@ -166,10 +168,7 @@ class AssetLocksTest(DashTestFramework):
         locked_2 = 10 * COIN + 314159
         asset_lock_tx = create_assetlock(node, coin, locked_1, pubkey)
 
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_lock_tx.rehash(), 'allowed': True }],
-            rawtxs=[asset_lock_tx.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_lock_tx, result_expected={'allowed': True})
         assert_equal(get_credit_pool_amount(node), 0)
         txid_in_block = node.sendrawtransaction(hexstring=asset_lock_tx.serialize().hex(), maxfeerate=0)
 
@@ -228,14 +227,9 @@ class AssetLocksTest(DashTestFramework):
         asset_unlock_tx_duplicate_index = copy.deepcopy(asset_unlock_tx)
         asset_unlock_tx_duplicate_index.vout[0].nValue += COIN
 
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx.rehash(), 'allowed': True }],
-            rawtxs=[asset_unlock_tx.serialize().hex()],
-        )
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_duplicate_index.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-verified'}],
-            rawtxs=[asset_unlock_tx_duplicate_index.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_unlock_tx, result_expected={'allowed': True})
+        self.check_mempool_result(tx=asset_unlock_tx_duplicate_index,
+                result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-verified'})
 
         # validate that we calculate payload hash correctly: ask quorum forcely by message hash
         asset_unlock_tx_payload = CAssetUnlockTx()
@@ -256,10 +250,8 @@ class AssetLocksTest(DashTestFramework):
         except JSONRPCException as e:
             assert "Transaction already in block chain" in e.error['message']
 
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_duplicate_index.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-duplicated-index'}],
-            rawtxs=[asset_unlock_tx_duplicate_index.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_unlock_tx_duplicate_index,
+                result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-duplicated-index'})
         try:
             node.sendrawtransaction(hexstring=asset_unlock_tx_duplicate_index.serialize().hex(), maxfeerate=0)
             raise AssertionError("Transaction should not be mined: double index")
@@ -273,10 +265,7 @@ class AssetLocksTest(DashTestFramework):
         self.mine_quorum()
         # should stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_late.rehash(), 'allowed': True }],
-            rawtxs=[asset_unlock_tx_late.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_unlock_tx_late, result_expected={'allowed': True})
         # should still stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - COIN)
         node.sendrawtransaction(hexstring=asset_unlock_tx_late.serialize().hex(), maxfeerate=0)
@@ -288,17 +277,14 @@ class AssetLocksTest(DashTestFramework):
         node.generate(100)
         self.sync_all()
 
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_too_late.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'}],
-            rawtxs=[asset_unlock_tx_too_late.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_unlock_tx_too_late,
+                result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'})
 
         # two quorums later is too late
         self.mine_quorum()
-        self.check_mempool_result(
-            result_expected=[{'txid': asset_unlock_tx_inactive_quorum.rehash(), 'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-active-quorum'}],
-            rawtxs=[asset_unlock_tx_inactive_quorum.serialize().hex()],
-        )
+        self.check_mempool_result(tx=asset_unlock_tx_inactive_quorum,
+                result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-active-quorum'})
+
         block_to_reconsider = node.getbestblockhash()
         self.log.info("Test block invalidation with asset unlock tx...")
         for inode in self.nodes:
@@ -344,10 +330,7 @@ class AssetLocksTest(DashTestFramework):
 
         # Mempool doesn't know about the size of the credit pool, so the transaction will be accepted to mempool,
         # but won't be mined
-        self.check_mempool_result(
-            result_expected=[{'txid': aset_unlock_tx_full.rehash(), 'allowed': True }],
-            rawtxs=[aset_unlock_tx_full.serialize().hex()],
-        )
+        self.check_mempool_result(tx=aset_unlock_tx_full, result_expected={'allowed': True })
 
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
         node.generate(13)
@@ -361,10 +344,7 @@ class AssetLocksTest(DashTestFramework):
 
         self.mempool_size += 1
         aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool_amount(node), pubkey)
-        self.check_mempool_result(
-            result_expected=[{'txid': aset_unlock_tx_full.rehash(), 'allowed': True }],
-            rawtxs=[aset_unlock_tx_full.serialize().hex()],
-        )
+        self.check_mempool_result(tx=aset_unlock_tx_full, result_expected={'allowed': True })
 
         txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
         node.generate(1)
