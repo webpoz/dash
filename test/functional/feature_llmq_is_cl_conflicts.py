@@ -284,6 +284,7 @@ class LLMQ_IS_CL_Conflicts(DashTestFramework):
         coinbasevalue = bt['coinbasevalue']
         miner_address = node.getnewaddress()
         mn_payee = bt['masternode'][0]['payee']
+        print(f'next payee: {mn_payee}')
 
         # calculate fees that the block template included (we'll have to remove it from the coinbase as we won't
         # include the template's transactions
@@ -301,6 +302,7 @@ class LLMQ_IS_CL_Conflicts(DashTestFramework):
             for txout in tx.vout:
                 out_value += txout.nValue
             new_fees += in_value - out_value
+        print(f'vtx: {vtx}')
 
         # fix fees
         coinbasevalue -= bt_fees
@@ -310,13 +312,14 @@ class LLMQ_IS_CL_Conflicts(DashTestFramework):
         realloc_height = 99999999
         if realloc_info['status'] == 'active':
             realloc_height = realloc_info['since']
+        print(f'height: {height} cbvalue: {coinbasevalue}')
         mn_amount = get_masternode_payment(height, coinbasevalue, realloc_height)
         miner_amount = coinbasevalue - mn_amount
 
         outputs = {miner_address: str(Decimal(miner_amount) / COIN)}
         if mn_amount > 0:
             outputs[mn_payee] = str(Decimal(mn_amount) / COIN)
-
+        print(f'output: {outputs}')
         coinbase = FromHex(CTransaction(), node.createrawtransaction([], outputs))
         coinbase.vin = create_coinbase(height).vin
 
