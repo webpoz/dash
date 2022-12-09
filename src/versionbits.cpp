@@ -5,6 +5,29 @@
 #include <versionbits.h>
 #include <consensus/params.h>
 
+static int calculateStartHeight(const CBlockIndex* pindexPrev, const int nPeriod, const ThresholdConditionCache& cache) {
+    auto cache_it = cache.find(pindexPrev);
+    assert(cache_it != cache.end());
+    switch (cache_it->second) {
+        case ThresholdState::DEFINED: {
+            // not started yet, nothinig to do
+            break;
+        }
+        case ThresholdState::STARTED: {
+            int nStartHeight{pindexPrev->nHeight + 1};
+            const CBlockIndex *pindex_search = pindexPrev->GetAncestor(pindexPrev->nHeight - nPeriod);
+            return std::min(nStartHeight, calculateStartHeight(pindex_search, nPeriod, cache));
+        }
+        case ThresholdState::LOCKED_IN:
+        case ThresholdState::FAILED:
+        case ThresholdState::ACTIVE: {
+            // too late, nothing to do
+            break;
+        }
+    }
+    return std::numeric_limits<int>::max();
+}
+
 ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex* pindexPrev, const Consensus::Params& params, ThresholdConditionCache& cache) const
 {
     int nPeriod = Period(params);
@@ -37,35 +60,7 @@ ThresholdState AbstractThresholdConditionChecker::GetStateFor(const CBlockIndex*
     assert(cache.count(pindexPrev));
     ThresholdState state = cache[pindexPrev];
 
-    auto pindex_search = pindexPrev;
-    auto state_search = state;
-    bool do_search{true};
-    int nStartHeight{std::numeric_limits<int>::max()};
-    while (do_search) {
-        switch (state_search) {
-            case ThresholdState::DEFINED: {
-                // not started yet, nothinig to do
-                do_search = false;
-                break;
-            }
-            case ThresholdState::STARTED: {
-                nStartHeight = std::min(nStartHeight, pindex_search->nHeight + 1);
-                // we can walk back here because the only way for STARTED state to exist
-                // in cache already is to be calculated in previous runs via "walk forward"
-                // loop below starting from DEFINED state.
-                pindex_search = pindex_search->GetAncestor(pindex_search->nHeight - nPeriod);
-                state_search = cache[pindex_search];
-                break;
-            }
-            case ThresholdState::LOCKED_IN:
-            case ThresholdState::FAILED:
-            case ThresholdState::ACTIVE: {
-                // too late, nothing to do
-                do_search = false;
-                break;
-            }
-        }
-    }
+    int nStartHeight = calculateStartHeight(pindexPrev, nPeriod, cache);
 
     // Now walk forward and compute the state of descendants of pindexPrev
     while (!vToCompute.empty()) {
