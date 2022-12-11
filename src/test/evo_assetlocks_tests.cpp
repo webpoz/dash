@@ -159,17 +159,18 @@ BOOST_FIXTURE_TEST_CASE(evo_assetlock, TestChain100Setup)
     }
 
     {
-        // Outputs should not be bigger than inputs
         auto inSum = coins.GetValueIn(CTransaction(tx));
         auto outSum = CTransaction(tx).GetValueOut();
-        BOOST_CHECK(inSum >= outSum);
+        BOOST_CHECK(inSum == outSum);
 
+        // Outputs should not be bigger than inputs
         CMutableTransaction txBigOutput = tx;
-        txBigOutput.vout[0].nValue += CENT;
-        BOOST_CHECK(CheckAssetLockTx(CTransaction(txBigOutput)).did_err);
+        txBigOutput.vout[0].nValue += 1;
+        BOOST_CHECK(CheckAssetLockTx(CTransaction(txBigOutput)).error_str == "bad-assetlocktx-creditamount");
 
+        // Smaller outputs are allown
         CMutableTransaction txSmallOutput = tx;
-        txSmallOutput.vout[1].nValue -= CENT;
+        txSmallOutput.vout[1].nValue -= 1;
         BOOST_CHECK(!CheckAssetLockTx(CTransaction(txSmallOutput)).did_err);
     }
 
@@ -269,7 +270,8 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
     BOOST_CHECK_MESSAGE(CheckTransaction(CTransaction(tx), state), strTest);
     BOOST_CHECK(state.IsValid());
 
-    BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), ::ChainActive().Tip()).error_str == "bad-assetunlock-quorum-hash");
+    const CBlockIndex *block_index = ::ChainActive().Tip();
+    BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), block_index).error_str == "bad-assetunlock-quorum-hash");
 
     {
         // Any input should be a reason to fail CheckAssetUnlockTx()
@@ -286,7 +288,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         std::string reason;
         BOOST_CHECK(IsStandardTx(CTransaction(tx), reason));
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNonemptyInput), ::ChainActive().Tip()).error_str == "bad-assetunlocktx-have-input");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNonemptyInput), block_index).error_str == "bad-assetunlocktx-have-input");
     }
 
     // Check version
@@ -295,7 +297,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         // Wrong type "Asset Lock TX" instead "Asset Unlock TX"
         CMutableTransaction txWrongType = tx;
         txWrongType.nType = TRANSACTION_ASSET_LOCK;
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txWrongType), ::ChainActive().Tip()).error_str == "bad-assetunlocktx-type");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txWrongType), block_index).error_str == "bad-assetunlocktx-type");
     }
 
     {
@@ -312,7 +314,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         CAssetUnlockPayload assetUnlockNegativeFee(1, 1, -CENT, 1, {}, {});
         SetTxPayload(txNegativeFee, assetUnlockNegativeFee);
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNegativeFee), ::ChainActive().Tip()).error_str == "bad-assetunlocktx-negative-fee");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNegativeFee), block_index).error_str == "bad-assetunlocktx-negative-fee");
     }
 
     {
@@ -325,13 +327,13 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
             out.scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
         }
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), ::ChainActive().Tip()).error_str == "bad-assetunlock-quorum-hash");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index).error_str == "bad-assetunlock-quorum-hash");
 
         // Should not be more than 32 withdrawal in one transaction
         txManyOutputs.vout.resize(outputsLimit + 1);
         txManyOutputs.vout.back().nValue = CENT;
         txManyOutputs.vout.back().scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), ::ChainActive().Tip()).error_str == "bad-assetunlocktx-too-many-outs");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index).error_str == "bad-assetunlocktx-too-many-outs");
     }
 
 }
