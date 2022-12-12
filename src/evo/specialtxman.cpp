@@ -7,6 +7,7 @@
 #include <chainparams.h>
 #include <consensus/validation.h>
 #include <evo/cbtx.h>
+#include <evo/creditpool.h>
 #include <evo/deterministicmns.h>
 #include <evo/mnhftx.h>
 #include <evo/providertx.h>
@@ -49,7 +50,7 @@ bool CheckSpecialTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVali
             if (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_V19) != ThresholdState::ACTIVE) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "v19-not-active");
             }
-            if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev); maybeError.did_err) {
+            if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev, creditPoolManager->getCreditPool(pindexPrev, Params().GetConsensus())); maybeError.did_err) {
                 return state.Invalid(maybeError.reason, false, REJECT_INVALID, std::string(maybeError.error_str));
             }
             return true;

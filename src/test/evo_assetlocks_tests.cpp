@@ -271,7 +271,8 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
     BOOST_CHECK(state.IsValid());
 
     const CBlockIndex *block_index = ::ChainActive().Tip();
-    BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), block_index).error_str == "bad-assetunlock-quorum-hash");
+    CreditPoolCb pool;
+    BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), block_index, pool).error_str == "bad-assetunlock-quorum-hash");
 
     {
         // Any input should be a reason to fail CheckAssetUnlockTx()
@@ -288,7 +289,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         std::string reason;
         BOOST_CHECK(IsStandardTx(CTransaction(tx), reason));
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNonemptyInput), block_index).error_str == "bad-assetunlocktx-have-input");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNonemptyInput), block_index, pool).error_str == "bad-assetunlocktx-have-input");
     }
 
     // Check version
@@ -297,7 +298,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         // Wrong type "Asset Lock TX" instead "Asset Unlock TX"
         CMutableTransaction txWrongType = tx;
         txWrongType.nType = TRANSACTION_ASSET_LOCK;
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txWrongType), block_index).error_str == "bad-assetunlocktx-type");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txWrongType), block_index, pool).error_str == "bad-assetunlocktx-type");
     }
 
     {
@@ -314,7 +315,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         CAssetUnlockPayload assetUnlockNegativeFee(1, 1, -CENT, 1, {}, {});
         SetTxPayload(txNegativeFee, assetUnlockNegativeFee);
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNegativeFee), block_index).error_str == "bad-assetunlocktx-negative-fee");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNegativeFee), block_index, pool).error_str == "bad-assetunlocktx-negative-fee");
     }
 
     {
@@ -327,13 +328,13 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
             out.scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
         }
 
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index).error_str == "bad-assetunlock-quorum-hash");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index, pool).error_str == "bad-assetunlock-quorum-hash");
 
         // Should not be more than 32 withdrawal in one transaction
         txManyOutputs.vout.resize(outputsLimit + 1);
         txManyOutputs.vout.back().nValue = CENT;
         txManyOutputs.vout.back().scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index).error_str == "bad-assetunlocktx-too-many-outs");
+        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txManyOutputs), block_index, pool).error_str == "bad-assetunlocktx-too-many-outs");
     }
 
 }
@@ -342,17 +343,21 @@ BOOST_FIXTURE_TEST_CASE(evo_skipset, TestChain100Setup)
 {
     std::mt19937 gen;
     for (size_t test = 0; test < 17; ++test) {
-        std::uniform_int_distribution<int64_t> dist_value(0, (1 << test));
+        std::uniform_int_distribution<uint64_t> dist_value(0, (1 << test));
         size_t skip_size = test ? (1 << (test - 1)) : 1;
         SkipSet set_1{skip_size};
-        std::unordered_set<int64_t> set_2;
+        std::unordered_set<uint64_t> set_2;
         for (size_t iter = 0; iter < (1 << test) * 2; ++iter) {
-            int64_t value = dist_value(gen);
+            uint64_t value = dist_value(gen);
             BOOST_CHECK(set_1.contains(value) == !!set_2.count(value));
-            if (!set_1.contains(value)) {
-                if (set_1.add(value)) {
-                    set_2.insert(value);
-                }
+            CValidationState state;
+            if (set_1.canBeAdded(value, state)) {
+                BOOST_CHECK(!set_1.contains(value));
+                BOOST_CHECK(set_1.add(value));
+                set_2.insert(value);
+            } else {
+                if (state.GetRejectReason() == "failed-creditpool-duplicated-index") BOOST_CHECK(set_2.count(value));
+                if (state.GetRejectReason() == "failed-getcbforblock-index-exceed") BOOST_CHECK(!set_2.count(value));
             }
             BOOST_CHECK(set_1.contains(value) == !!set_2.count(value));
             BOOST_CHECK(set_1.size() == set_2.size());

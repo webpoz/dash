@@ -32,9 +32,11 @@ struct SkipSet {
     explicit SkipSet(size_t capacity_limit = 10'000)
         : capacity_limit(capacity_limit) {}
 
-    [[nodiscard]] bool add(int64_t value);
+    [[nodiscard]] bool add(uint64_t value);
 
-    bool contains(int64_t value) const;
+    bool canBeAdded(uint64_t value, CValidationState& state) const;
+
+    bool contains(uint64_t value) const;
 
     size_t size() const {
         return right - skipped.size();
@@ -49,8 +51,8 @@ struct SkipSet {
         READWRITE(obj.skipped);
     }
 private:
-    std::unordered_set<int64_t> skipped;
-    int64_t right{0};
+    std::unordered_set<uint64_t> skipped;
+    uint64_t right{0};
     size_t capacity_limit;
 };
 
@@ -92,7 +94,8 @@ struct CreditPoolCbDiff {
         return pool.locked + sessionLocked - sessionUnlocked;
     }
 private:
-    CreditPoolCb pool;
+    const CreditPoolCb pool;
+    std::set<int64_t> newIndexes;
 };
 
 class CCreditPoolManager
@@ -107,7 +110,7 @@ private:
     static constexpr int DISK_SNAPSHOT_PERIOD = 576; // once per day
 private:
     std::optional<CreditPoolCb> getFromCache(const uint256& block_hash, int height);
-    void addToCache(const uint256& block_hash, int height, CreditPoolCb pool);
+    void addToCache(const uint256& block_hash, int height, const CreditPoolCb& pool);
 
 public:
 
@@ -119,6 +122,7 @@ public:
 
     ~CCreditPoolManager() = default;
 
+    // getCreditPOol throws an exception if something went wrong
     CreditPoolCb getCreditPool(const CBlockIndex* block, const Consensus::Params& consensusParams);
 };
 

@@ -21,13 +21,13 @@
 /*
    Common code for Asset Lock and Asset Unlock
     */
-maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev)
+maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CreditPoolCb& creditPool)
 {
     switch (tx.nType) {
     case TRANSACTION_ASSET_LOCK:
         return CheckAssetLockTx(tx);
     case TRANSACTION_ASSET_UNLOCK:
-        return CheckAssetUnlockTx(tx, pindexPrev);
+        return CheckAssetUnlockTx(tx, pindexPrev, creditPool);
     default:
         return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-not-asset-locks-at-all"};
     }
@@ -161,7 +161,7 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, const CBlockI
     return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-not-verified"};
 }
 
-maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev)
+maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CreditPoolCb& creditPool)
 {
     if (tx.nType != TRANSACTION_ASSET_UNLOCK) {
         return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-assetunlocktx-type"};
@@ -188,11 +188,8 @@ maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindex
         return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-assetunlocktx-negative-fee"};
     }
 
-    { // validate index
-        CreditPoolCb creditPool = creditPoolManager->getCreditPool(pindexPrev, Params().GetConsensus());
-        if (creditPool.indexes.contains(assetUnlockTx.getIndex())) {
-            return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-duplicated-index"};
-        }
+    if (creditPool.indexes.contains(assetUnlockTx.getIndex())) {
+        return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-duplicated-index"};
     }
 
     const CBlockIndex* pindexQuorum = WITH_LOCK(cs_main, return LookupBlockIndex(assetUnlockTx.getQuorumHash()));
