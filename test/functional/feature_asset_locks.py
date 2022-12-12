@@ -158,6 +158,21 @@ class AssetLocksTest(DashTestFramework):
         except JSONRPCException as e:
             assert "Invalid or non-wallet transaction id" in e.error['message']
 
+    def send_tx(self, tx, expected_error = None, reason = None):
+        try:
+            tx = self.nodes[0].sendrawtransaction(hexstring=tx.serialize().hex(), maxfeerate=0)
+            if expected_error is None:
+                return tx
+
+            # failure didn't happen, but expected:
+            message = "Transaction should not be accepted"
+            if reason is not None:
+                message += ": " + reason
+
+            raise AssertionError(message)
+        except JSONRPCException as e:
+            assert expected_error in e.error['message']
+
     def run_test(self):
         node = self.nodes[0]
 
@@ -182,7 +197,7 @@ class AssetLocksTest(DashTestFramework):
 
         self.check_mempool_result(tx=asset_lock_tx, result_expected={'allowed': True})
         assert_equal(get_credit_pool_amount(node), 0)
-        txid_in_block = node.sendrawtransaction(hexstring=asset_lock_tx.serialize().hex(), maxfeerate=0)
+        txid_in_block = self.send_tx(asset_lock_tx)
 
         self.sync_mempools()
         assert_equal(get_credit_pool_amount(node), 0)
@@ -208,8 +223,7 @@ class AssetLocksTest(DashTestFramework):
         self.log.info("Resubmit asset lock tx to new chain...")
         # NEW tx appears
         asset_lock_tx_2 = create_assetlock(node, coin, locked_2, pubkey)
-
-        txid_in_block = node.sendrawtransaction(hexstring=asset_lock_tx_2.serialize().hex(), maxfeerate=0)
+        txid_in_block = self.send_tx(asset_lock_tx_2)
         node.generate(1)
         self.sync_all()
 
@@ -231,7 +245,7 @@ class AssetLocksTest(DashTestFramework):
         self.log.info("Testing asset unlock...")
         # tx asset_unlock_tx_index_too_far should not be mined at first
         asset_unlock_tx_index_too_far = create_assetunlock(node,self.mninfo, 10001, COIN, pubkey)
-        tx_too_far_index = node.sendrawtransaction(hexstring=asset_unlock_tx_index_too_far.serialize().hex(), maxfeerate=0)
+        tx_too_far_index = self.send_tx(asset_unlock_tx_index_too_far)
         node.generate(1)
         self.sync_all()
         self.mempool_size += 1
@@ -257,7 +271,7 @@ class AssetLocksTest(DashTestFramework):
 
         assert_equal(asset_unlock_tx_payload.quorumHash, int(self.mninfo[0].node.quorum("selectquorum", llmq_type_test, 'e6c7a809d79f78ea85b72d5df7e9bd592aecf151e679d6e976b74f053a7f9056')["quorumHash"], 16))
 
-        node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
+        self.send_tx(asset_unlock_tx)
         assert_equal(get_credit_pool_amount(node), locked_1)
         # need to mine exactly 2 blocks to be sure that SkipSet lets far transaction appears in block
         node.generate(1)
@@ -269,19 +283,15 @@ class AssetLocksTest(DashTestFramework):
         self.check_mempool_size()
         block_asset_unlock = node.getrawtransaction(asset_unlock_tx.rehash(), 1)['blockhash']
 
-        try:
-            node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
-            raise AssertionError("Transaction should not be mined: double copy")
-        except JSONRPCException as e:
-            assert "Transaction already in block chain" in e.error['message']
+        self.send_tx(asset_unlock_tx,
+            expected_error = "Transaction already in block chain",
+            reason = "double copy")
 
         self.check_mempool_result(tx=asset_unlock_tx_duplicate_index,
                 result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-duplicated-index'})
-        try:
-            node.sendrawtransaction(hexstring=asset_unlock_tx_duplicate_index.serialize().hex(), maxfeerate=0)
-            raise AssertionError("Transaction should not be mined: double index")
-        except JSONRPCException as e:
-            assert "bad-assetunlock-duplicated-index" in e.error['message']
+        self.send_tx(asset_unlock_tx_duplicate_index,
+            expected_error = "bad-assetunlock-duplicated-index",
+            reason = "double index")
 
         # transaction with too far index should be mined too, because it is not too far anymore
         assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
@@ -294,7 +304,7 @@ class AssetLocksTest(DashTestFramework):
         self.check_mempool_result(tx=asset_unlock_tx_late, result_expected={'allowed': True})
         # should still stay same
         assert_equal(get_credit_pool_amount(node), locked_1 - 2 * COIN)
-        node.sendrawtransaction(hexstring=asset_unlock_tx_late.serialize().hex(), maxfeerate=0)
+        self.send_tx(asset_unlock_tx_late)
         node.generate(1)
         self.sync_all()
         assert_equal(get_credit_pool_amount(node), locked_1 - 3 * COIN)
@@ -352,23 +362,23 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node, block_hash_1), locked_1)
 
         # too big withdrawal should not be mined
-        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 201, 1 + get_credit_pool_amount(node), pubkey)
+        asset_unlock_tx_full = create_assetunlock(node, self.mninfo, 201, 1 + get_credit_pool_amount(node), pubkey)
 
         # Mempool doesn't know about the size of the credit pool, so the transaction will be accepted to mempool,
         # but won't be mined
-        self.check_mempool_result(tx=aset_unlock_tx_full, result_expected={'allowed': True })
+        self.check_mempool_result(tx=asset_unlock_tx_full, result_expected={'allowed': True })
 
-        txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
+        txid_in_block = self.send_tx(asset_unlock_tx_full)
         node.generate(13)
         self.sync_all()
 
         self.ensure_tx_is_not_mined(txid_in_block)
 
         self.mempool_size += 1
-        aset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool_amount(node), pubkey)
-        self.check_mempool_result(tx=aset_unlock_tx_full, result_expected={'allowed': True })
+        asset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool_amount(node), pubkey)
+        self.check_mempool_result(tx=asset_unlock_tx_full, result_expected={'allowed': True })
 
-        txid_in_block = node.sendrawtransaction(hexstring=aset_unlock_tx_full.serialize().hex(), maxfeerate=0)
+        txid_in_block = self.send_tx(asset_unlock_tx_full)
         node.generate(1)
         self.sync_all()
         # check txid_in_block was mined
