@@ -129,6 +129,9 @@ class AssetLocksTest(DashTestFramework):
     def skip_test_if_missing_module(self):
         self.skip_if_no_wallet()
 
+    def check_mempool_size(self):
+        assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
+
     def check_mempool_result(self, result_expected, tx):
         """Wrapper to check result of testmempoolaccept on node_0's mempool"""
         result_expected['txid'] = tx.rehash()
@@ -136,7 +139,7 @@ class AssetLocksTest(DashTestFramework):
         result_test = self.nodes[0].testmempoolaccept([tx.serialize().hex()])
 
         assert_equal([result_expected], result_test)
-        assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
+        self.check_mempool_size()
 
     def set_sporks(self):
         spork_enabled = 0
@@ -173,6 +176,8 @@ class AssetLocksTest(DashTestFramework):
         coin = coins.pop()
         locked_1 = 10 * COIN + 141421
         locked_2 = 10 * COIN + 314159
+        while COIN * coin['amount'] < locked_2:
+            coin = coins.pop()
         asset_lock_tx = create_assetlock(node, coin, locked_1, pubkey)
 
         self.check_mempool_result(tx=asset_lock_tx, result_expected={'allowed': True})
@@ -254,10 +259,14 @@ class AssetLocksTest(DashTestFramework):
 
         node.sendrawtransaction(hexstring=asset_unlock_tx.serialize().hex(), maxfeerate=0)
         assert_equal(get_credit_pool_amount(node), locked_1)
-        # need to mine at least 2 to be sure that SkipSet let far transaction appears in block
-        node.generate(2)
+        # need to mine exactly 2 blocks to be sure that SkipSet lets far transaction appears in block
+        node.generate(1)
+        self.sync_all()
+        self.check_mempool_size()
+        node.generate(1)
         self.sync_all()
         self.mempool_size -= 1
+        self.check_mempool_size()
         block_asset_unlock = node.getrawtransaction(asset_unlock_tx.rehash(), 1)['blockhash']
 
         try:
