@@ -44,6 +44,7 @@ from test_framework.util import (
 
 llmq_type_test = 100
 tiny_amount = int(Decimal("0.0007") * COIN)
+blocks_in_one_day = 576
 
 def create_assetlock(node, coin, amount, pubkey):
     inputs = [CTxIn(COutPoint(int(coin["txid"], 16), coin["vout"]))]
@@ -172,6 +173,15 @@ class AssetLocksTest(DashTestFramework):
             raise AssertionError(message)
         except JSONRPCException as e:
             assert expected_error in e.error['message']
+
+    def slowly_generate_batch(self, amount):
+        while amount > 0:
+            self.log.info(f"Generating batch of blocks {amount} left")
+            next = min(20, amount)
+            amount -= next
+            self.bump_mocktime(next)
+            self.nodes[0].generate(next)
+            self.sync_all()
 
     def run_test(self):
         node = self.nodes[0]
@@ -310,8 +320,7 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), locked_1 - 3 * COIN)
 
         # generate many blocks to make quorum far behind (even still active)
-        node.generate(100)
-        self.sync_all()
+        self.slowly_generate_batch(60)
 
         self.check_mempool_result(tx=asset_unlock_tx_too_late,
                 result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'})
@@ -327,8 +336,7 @@ class AssetLocksTest(DashTestFramework):
             inode.invalidateblock(block_asset_unlock)
         assert_equal(get_credit_pool_amount(node), locked_1)
         # generate some new blocks
-        node.generate(90)
-        self.sync_all()
+        self.slowly_generate_batch(50)
         assert_equal(get_credit_pool_amount(node), locked_1)
         for inode in self.nodes:
             inode.reconsiderblock(block_to_reconsider)
@@ -355,7 +363,7 @@ class AssetLocksTest(DashTestFramework):
 
         # ----
 
-        node.generate(13)
+        node.generate(1)
         self.sync_all()
 
         assert_equal(get_credit_pool_amount(node), locked_1 - 3 * COIN)
@@ -369,7 +377,7 @@ class AssetLocksTest(DashTestFramework):
         self.check_mempool_result(tx=asset_unlock_tx_full, result_expected={'allowed': True })
 
         txid_in_block = self.send_tx(asset_unlock_tx_full)
-        node.generate(13)
+        node.generate(1)
         self.sync_all()
 
         self.ensure_tx_is_not_mined(txid_in_block)
@@ -392,11 +400,11 @@ class AssetLocksTest(DashTestFramework):
             raise AssertionError("Transaction should not be mined: double index")
         except JSONRPCException as e:
             assert "bad-assetunlock-duplicated-index" in e.error['message']
-        # test withdrawal limits
-        # fast-forward to next day to reset previous limits
-        node.generate(576 + 1)
-        self.sync_all()
+
+        self.log.info("Fast forward to the next day to reset all current unlock limits...")
+        self.slowly_generate_batch(blocks_in_one_day  + 1)
         self.mine_quorum()
+
         total = get_credit_pool_amount(node)
         while total <= 10_900 * COIN:
             coin = coins.pop()
@@ -442,8 +450,8 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(node.getmempoolinfo()['size'], 1)
 
         assert_equal(new_total, get_credit_pool_amount(node))
-        node.generate(574) # one day: 576 blocks
-        self.sync_all()
+        self.log.info("Fast forward to next day again...")
+        self.slowly_generate_batch(blocks_in_one_day - 2)
         # but should disappear later
         assert_equal(node.getmempoolinfo()['size'], 0)
 
@@ -470,8 +478,8 @@ class AssetLocksTest(DashTestFramework):
 
         # all tx should be dropped from mempool because too far
         # but amount in credit pool should be still same after many blocks
-        node.generate(700)
-        self.sync_all()
+        self.log.info("generate many blocks to be sure that mempool is empty afterwards...")
+        self.slowly_generate_batch(60)
         assert_equal(new_total, get_credit_pool_amount(node))
         assert_equal(node.getmempoolinfo()['size'], 0)
 
