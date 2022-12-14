@@ -177,7 +177,7 @@ class AssetLocksTest(DashTestFramework):
     def slowly_generate_batch(self, amount):
         while amount > 0:
             self.log.info(f"Generating batch of blocks {amount} left")
-            next = min(20, amount)
+            next = min(10, amount)
             amount -= next
             self.bump_mocktime(next)
             self.nodes[0].generate(next)
