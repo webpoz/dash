@@ -9,6 +9,7 @@
 
 template<typename T>
 struct Ok {
+    static_assert(std::is_trivially_constructible<T>(), "T must be trivially constructable");
     constexpr explicit Ok(T val) : val_(std::move(val)) {}
     T val_;
 };
@@ -21,6 +22,7 @@ struct Ok<void> {
 template<typename E>
 struct Err {
     constexpr explicit Err(E val) : val_(std::move(val)) {}
+    static_assert(std::is_trivially_constructible<E>(), "E must be trivially constructable");
     E val_;
 };
 

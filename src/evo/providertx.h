@@ -23,7 +23,7 @@ class CValidationState;
 
 struct ErrReasonAndMessage {
     ValidationInvalidReason reason;
-    std::string_view message;
+    const char* message;
 };
 
 class CProRegTx
