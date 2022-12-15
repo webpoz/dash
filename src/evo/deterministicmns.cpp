@@ -1251,8 +1251,8 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
-        return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.is_err()) {
+        return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
     }
 
     // It's allowed to set addr to 0, which will put the MN into PoSe-banned state and require a ProUpServTx to be issues later
@@ -1325,8 +1325,8 @@ bool CheckProRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CValid
         }
     }
 
-    if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.did_err) {
-        return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+    if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.is_err()) {
+        return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
     }
 
     if (keyForPayloadSig) {
@@ -1356,8 +1356,8 @@ bool CheckProUpServTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVa
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
-        return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.is_err()) {
+        return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
     }
 
     if (!CheckService(ptx, state)) {
@@ -1388,8 +1388,8 @@ bool CheckProUpServTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVa
         }
 
         // we can only check the signature if pindexPrev != nullptr and the MN is known
-        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.did_err) {
-            return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.is_err()) {
+            return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
         }
         if (check_sigs && !CheckHashSig(ptx, mn->pdmnState->pubKeyOperator.Get(), state)) {
             // pass the state returned by the function above
@@ -1411,8 +1411,8 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
-        return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.is_err()) {
+        return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
     }
 
     CTxDestination payoutDest;
@@ -1461,8 +1461,8 @@ bool CheckProUpRegTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
             }
         }
 
-        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.did_err) {
-            return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.is_err()) {
+            return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
         }
         if (check_sigs && !CheckHashSig(ptx, dmn->pdmnState->keyIDOwner, state)) {
             // pass the state returned by the function above
@@ -1484,8 +1484,8 @@ bool CheckProUpRevTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-payload");
     }
 
-    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.did_err) {
-        return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+    if (auto maybe_err = ptx.IsTriviallyValid(); maybe_err.is_err()) {
+        return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
     }
 
     if (pindexPrev) {
@@ -1494,8 +1494,8 @@ bool CheckProUpRevTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVal
         if (!dmn)
             return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "bad-protx-hash");
 
-        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.did_err) {
-            return state.Invalid(maybe_err.reason, false, REJECT_INVALID, std::string(maybe_err.error_str));
+        if (auto maybe_err = CheckInputsHash(tx, ptx); maybe_err.is_err()) {
+            return state.Invalid(maybe_err.unwrap_err().first, false, REJECT_INVALID, std::string(maybe_err.unwrap_err().second));
         }
         if (check_sigs && !CheckHashSig(ptx, dmn->pdmnState->pubKeyOperator.Get(), state)) {
             // pass the state returned by the function above

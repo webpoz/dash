@@ -15,18 +15,11 @@
 #include <pubkey.h>
 #include <univalue.h>
 
+#include <util/result.h>
+
 class CBlockIndex;
 class CCoinsViewCache;
 class CValidationState;
-
-struct maybe_error{
-    bool did_err{false};
-    ValidationInvalidReason reason{ValidationInvalidReason::CONSENSUS};
-    std::string_view error_str;
-
-    constexpr maybe_error() = default;
-    constexpr maybe_error(ValidationInvalidReason reasonIn, std::string_view err): did_err(true), reason(reasonIn), error_str(err) {};
-};
 
 class CProRegTx
 {
@@ -94,7 +87,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    maybe_error IsTriviallyValid() const;
+    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
 };
 
 class CProUpServTx
@@ -134,7 +127,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    maybe_error IsTriviallyValid() const;
+    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
 };
 
 class CProUpRegTx
@@ -185,7 +178,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    maybe_error IsTriviallyValid() const;
+    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
 };
 
 class CProUpRevTx
@@ -229,17 +222,18 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    maybe_error IsTriviallyValid() const;
+    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
 };
 
 template <typename ProTx>
-static maybe_error CheckInputsHash(const CTransaction& tx, const ProTx& proTx)
+static Result<void, std::pair<ValidationInvalidReason, std::string_view>> CheckInputsHash(const CTransaction& tx, const ProTx& proTx)
 {
     if (uint256 inputsHash = CalcTxInputsHash(tx); inputsHash != proTx.inputsHash) {
-        return {ValidationInvalidReason::CONSENSUS, "bad-protx-inputs-hash"};
+        using namespace std::literals::string_view_literals;
+        return Err{std::pair(ValidationInvalidReason::CONSENSUS, "bad-protx-inputs-hash"sv)};
     }
 
-    return {};
+    return Ok<void>();
 }
 
 
