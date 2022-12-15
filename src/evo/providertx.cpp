@@ -12,37 +12,38 @@
 
 using namespace std::literals::string_view_literals;
 
-Result<void, std::pair<ValidationInvalidReason, std::string_view>> CProRegTx::IsTriviallyValid() const
+Result<void, ErrReasonAndMessage> CProRegTx::IsTriviallyValid() const
 {
+    using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProRegTx::CURRENT_VERSION) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-version"sv});
+        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-version"}};
     }
     if (nType != 0) {
-        return Err{std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-type"sv}};
+        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-type"}};
     }
     if (nMode != 0) {
-        return Err{std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"sv}};
+        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"}};
     }
 
     if (keyIDOwner.IsNull() || !pubKeyOperator.IsValid() || keyIDVoting.IsNull()) {
-        return Err{std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"sv}};
+        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"}};
     }
     if (!scriptPayout.IsPayToPublicKeyHash() && !scriptPayout.IsPayToScriptHash()) {
-        return Err{std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"sv}};
+        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"}};
     }
 
     CTxDestination payoutDest;
     if (!ExtractDestination(scriptPayout, payoutDest)) {
         // should not happen as we checked script types before
-        return Err{std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee-dest"sv}};
+        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee-dest"}};
     }
     // don't allow reuse of payout key for other keys (don't allow people to put the payee key onto an online server)
     if (payoutDest == CTxDestination(keyIDOwner) || payoutDest == CTxDestination(keyIDVoting)) {
-        return Err{std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee-reuse"sv}};
+        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee-reuse"}};
     }
 
     if (nOperatorReward > 10000) {
-        return Err{std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-operator-reward"sv}};
+        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-operator-reward"}};
     }
 
     return Ok<void>();
@@ -85,10 +86,10 @@ std::string CProRegTx::ToString() const
         nVersion, collateralOutpoint.ToStringShort(), addr.ToString(), (double)nOperatorReward / 100, EncodeDestination(keyIDOwner), pubKeyOperator.ToString(), EncodeDestination(keyIDVoting), payee);
 }
 
-Result<void, std::pair<ValidationInvalidReason, std::string_view>> CProUpServTx::IsTriviallyValid() const
+Result<void, ErrReasonAndMessage> CProUpServTx::IsTriviallyValid() const
 {
     if (nVersion == 0 || nVersion > CProUpServTx::CURRENT_VERSION) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-version"sv});
+        return Err<ErrReasonAndMessage>({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
     }
 
     return Ok<void>();
@@ -106,20 +107,21 @@ std::string CProUpServTx::ToString() const
         nVersion, proTxHash.ToString(), addr.ToString(), payee);
 }
 
-Result<void, std::pair<ValidationInvalidReason, std::string_view>> CProUpRegTx::IsTriviallyValid() const
+Result<void, ErrReasonAndMessage> CProUpRegTx::IsTriviallyValid() const
 {
+    using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProUpRegTx::CURRENT_VERSION) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-version"sv});
+        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
     }
     if (nMode != 0) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"sv});
+        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-mode"});
     }
 
     if (!pubKeyOperator.IsValid() || keyIDVoting.IsNull()) {
-        return Err(std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"sv});
+        return Err({ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"});
     }
     if (!scriptPayout.IsPayToPublicKeyHash() && !scriptPayout.IsPayToScriptHash()) {
-        return Err(std::pair{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"sv});
+        return Err({ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"});
     }
     return Ok<void>();
 }
@@ -136,16 +138,17 @@ std::string CProUpRegTx::ToString() const
         nVersion, proTxHash.ToString(), pubKeyOperator.ToString(), EncodeDestination(keyIDVoting), payee);
 }
 
-Result<void, std::pair<ValidationInvalidReason, std::string_view>> CProUpRevTx::IsTriviallyValid() const
+Result<void, ErrReasonAndMessage> CProUpRevTx::IsTriviallyValid() const
 {
+    using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProUpRevTx::CURRENT_VERSION) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-version"sv});
+        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
     }
 
     // nReason < CProUpRevTx::REASON_NOT_SPECIFIED is always `false` since
     // nReason is unsigned and CProUpRevTx::REASON_NOT_SPECIFIED == 0
     if (nReason > CProUpRevTx::REASON_LAST) {
-        return Err(std::pair{ValidationInvalidReason::CONSENSUS, "bad-protx-reason"sv});
+        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-reason"});
     }
     return Ok<void>();
 }

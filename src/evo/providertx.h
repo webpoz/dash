@@ -21,6 +21,11 @@ class CBlockIndex;
 class CCoinsViewCache;
 class CValidationState;
 
+struct ErrReasonAndMessage {
+    ValidationInvalidReason reason;
+    std::string_view message;
+};
+
 class CProRegTx
 {
 public:
@@ -87,7 +92,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
+    Result<void, ErrReasonAndMessage> IsTriviallyValid() const;
 };
 
 class CProUpServTx
@@ -127,7 +132,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
+    Result<void, ErrReasonAndMessage> IsTriviallyValid() const;
 };
 
 class CProUpRegTx
@@ -178,7 +183,7 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
+    Result<void, ErrReasonAndMessage> IsTriviallyValid() const;
 };
 
 class CProUpRevTx
@@ -222,15 +227,14 @@ public:
         obj.pushKV("inputsHash", inputsHash.ToString());
     }
 
-    Result<void, std::pair<ValidationInvalidReason, std::string_view>> IsTriviallyValid() const;
+    Result<void, ErrReasonAndMessage> IsTriviallyValid() const;
 };
 
 template <typename ProTx>
-static Result<void, std::pair<ValidationInvalidReason, std::string_view>> CheckInputsHash(const CTransaction& tx, const ProTx& proTx)
+static Result<void, ErrReasonAndMessage> CheckInputsHash(const CTransaction& tx, const ProTx& proTx)
 {
     if (uint256 inputsHash = CalcTxInputsHash(tx); inputsHash != proTx.inputsHash) {
-        using namespace std::literals::string_view_literals;
-        return Err{std::pair(ValidationInvalidReason::CONSENSUS, "bad-protx-inputs-hash"sv)};
+        return Err<ErrReasonAndMessage>{{ValidationInvalidReason::CONSENSUS, "bad-protx-inputs-hash"}};
     }
 
     return Ok<void>();
