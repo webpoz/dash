@@ -16,20 +16,20 @@ Result<void, ErrReasonAndMessage> CProRegTx::IsTriviallyValid() const
 {
     using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProRegTx::CURRENT_VERSION) {
-        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-version"}};
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-version"};
     }
     if (nType != 0) {
-        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-type"}};
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-type"};
     }
     if (nMode != 0) {
-        return Err{{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"}};
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"};
     }
 
     if (keyIDOwner.IsNull() || !pubKeyOperator.IsValid() || keyIDVoting.IsNull()) {
-        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"}};
+        return Err{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"};
     }
     if (!scriptPayout.IsPayToPublicKeyHash() && !scriptPayout.IsPayToScriptHash()) {
-        return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"}};
+        return Err{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"};
     }
 
     CTxDestination payoutDest;
@@ -89,7 +89,7 @@ std::string CProRegTx::ToString() const
 Result<void, ErrReasonAndMessage> CProUpServTx::IsTriviallyValid() const
 {
     if (nVersion == 0 || nVersion > CProUpServTx::CURRENT_VERSION) {
-        return Err<ErrReasonAndMessage>({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
+        return Err<ErrReasonAndMessage>{ValidationInvalidReason::CONSENSUS, "bad-protx-version"};
     }
 
     return Ok<void>();
@@ -111,17 +111,17 @@ Result<void, ErrReasonAndMessage> CProUpRegTx::IsTriviallyValid() const
 {
     using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProUpRegTx::CURRENT_VERSION) {
-        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-version"};
     }
     if (nMode != 0) {
-        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-mode"});
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-mode"};
     }
 
     if (!pubKeyOperator.IsValid() || keyIDVoting.IsNull()) {
-        return Err({ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"});
+        return Err{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-key-null"};
     }
     if (!scriptPayout.IsPayToPublicKeyHash() && !scriptPayout.IsPayToScriptHash()) {
-        return Err({ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"});
+        return Err{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"};
     }
     return Ok<void>();
 }
@@ -142,13 +142,13 @@ Result<void, ErrReasonAndMessage> CProUpRevTx::IsTriviallyValid() const
 {
     using Err = Err<ErrReasonAndMessage>;
     if (nVersion == 0 || nVersion > CProUpRevTx::CURRENT_VERSION) {
-        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-version"});
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-version"};
     }
 
     // nReason < CProUpRevTx::REASON_NOT_SPECIFIED is always `false` since
     // nReason is unsigned and CProUpRevTx::REASON_NOT_SPECIFIED == 0
     if (nReason > CProUpRevTx::REASON_LAST) {
-        return Err({ValidationInvalidReason::CONSENSUS, "bad-protx-reason"});
+        return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-reason"};
     }
     return Ok<void>();
 }

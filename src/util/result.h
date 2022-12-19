@@ -23,7 +23,11 @@ struct Ok<void> {
 
 template<typename E>
 struct Err {
-    constexpr explicit Err(E val) : val_(std::move(val)) {}
+    constexpr Err(E val) : val_(std::move(val)) {}
+
+    template<typename... Ts>
+    constexpr Err(Ts...t) : val_{t...} {}
+
     E val_;
 };
 

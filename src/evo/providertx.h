@@ -24,6 +24,8 @@ class CValidationState;
 struct ErrReasonAndMessage {
     ValidationInvalidReason reason;
     const char* message;
+
+    ErrReasonAndMessage() = default;
 };
 
 class CProRegTx
