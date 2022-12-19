@@ -34,10 +34,10 @@ struct Err {
 template<typename T, typename E>
 class Result {
 public:
-    constexpr Result(Ok<T> val) : val_{val} {}
-    constexpr Result(Err<E> err) : val_{err.val_} {}
+    constexpr Result(Ok<T> val) : result{val} {}
+    constexpr Result(Err<E> err) : result{err.val_} {}
 
-    [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(val_); }
+    [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(result); }
     [[nodiscard]] constexpr bool is_err() const { return !is_ok(); }
 
     [[nodiscard]] constexpr explicit operator bool() const {
@@ -52,16 +52,16 @@ public:
     template<typename U = T>
     [[nodiscard]] constexpr const U& unwrap() const {
         assert(is_ok());
-        return std::get<Ok<U>>(val_).val_;
+        return std::get<Ok<U>>(result).val_;
     }
 
-    [[nodiscard]] constexpr auto unwrap_err() const -> const E& {
+    [[nodiscard]] constexpr const E& err() const {
         assert(is_err());
-        return std::get<E>(val_);
+        return std::get<E>(result);
     }
 
 private:
-    std::variant<Ok<T>, E> val_;
+    std::variant<Ok<T>, E> result;
 };
 
 #endif
