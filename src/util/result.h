@@ -34,8 +34,8 @@ struct Err {
 template<typename T, typename E>
 class Result {
 public:
-    constexpr Result(Ok<T> val) : val_(std::variant<Ok<T>, E>(val)) {}
-    constexpr Result(Err<E> err) : val_(std::variant<Ok<T>, E>(err.val_)) {}
+    constexpr Result(Ok<T> val) : val_{val} {}
+    constexpr Result(Err<E> err) : val_{err.val_} {}
 
     [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(val_); }
     [[nodiscard]] constexpr bool is_err() const { return !is_ok(); }
