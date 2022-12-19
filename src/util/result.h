@@ -12,7 +12,7 @@
 template<typename T>
 struct Ok {
     constexpr explicit Ok(T val) : val_(std::move(val)) {}
-    T val_;
+    const T val_;
 };
 
 // Specialization of the Ok struct for void type
@@ -28,7 +28,7 @@ struct Err {
     template<typename... Ts>
     constexpr explicit Err(Ts...t) : val_{t...} {}
 
-    E val_;
+    const E val_;
 };
 
 template<typename T, typename E>
