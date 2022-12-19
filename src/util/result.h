@@ -39,16 +39,22 @@ public:
 
     [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(val_); }
     [[nodiscard]] constexpr bool is_err() const { return !is_ok(); }
+
     [[nodiscard]] constexpr explicit operator bool() const {
         return is_ok();
     }
-    [[nodiscard]] constexpr auto operator *() const -> T{
+
+    template<typename U = T>
+    [[nodiscard]] constexpr const U& operator*() const {
         return unwrap();
     }
-    [[nodiscard]] constexpr auto unwrap() const -> T {
+
+    template<typename U = T>
+    [[nodiscard]] constexpr const U& unwrap() const {
         assert(is_ok());
-        return std::get<Ok<T>>(val_).val_;
+        return std::get<Ok<U>>(val_).val_;
     }
+
     [[nodiscard]] constexpr auto unwrap_err() const -> const E& {
         assert(is_err());
         return std::get<E>(val_);
