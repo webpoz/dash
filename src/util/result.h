@@ -35,7 +35,7 @@ public:
 
     [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(val_); }
     [[nodiscard]] constexpr bool is_err() const { return !is_ok(); }
-    constexpr explicit operator bool() const {
+    [[nodiscard]] constexpr explicit operator bool() const {
         return is_ok();
     }
     [[nodiscard]] constexpr auto operator *() const -> T{
