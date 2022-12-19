@@ -49,7 +49,7 @@ public:
         assert(is_ok());
         return std::get<Ok<T>>(val_).val_;
     }
-    [[nodiscard]] constexpr auto unwrap_err() const -> E {
+    [[nodiscard]] constexpr auto unwrap_err() const -> const E& {
         assert(is_err());
         return std::get<E>(val_);
     }
