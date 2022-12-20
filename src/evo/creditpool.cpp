@@ -95,8 +95,13 @@ bool SkipSet::contains(uint64_t value) const {
     return skipped.find(value) == skipped.end();
 }
 
+std::string CreditPoolCb::ToString() const {
+    return strprintf("CreditPoolCb(locked=%lld,currentLimit=%lld,nIndexes=%lld)",
+            locked, currentLimit, indexes.size());
+}
+
 std::optional<CreditPoolCb> CCreditPoolManager::getFromCache(const uint256& block_hash, int height) {
-    CreditPoolCb pool{0, 0, {}};
+    CreditPoolCb pool;
     {
         LOCK(cs_cache);
         if (creditPoolCache.get(block_hash, pool)) {
@@ -143,7 +148,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
 {
     bool isDIP0027AssetLocksActive = llmq::utils::IsV19Active(block_index);
     if (!isDIP0027AssetLocksActive) {
-        return {0, 0, {}};
+        return {};
     }
 
     uint256 block_hash = block_index->GetBlockHash();
@@ -160,9 +165,9 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
         assert(prev.locked == 0);
         assert(prev.indexes.size() == 0);
 
-        CreditPoolCb pool{0, 0, {}};
-        addToCache(block_hash, block_height, pool);
-        return pool;
+        CreditPoolCb emptyPool;
+        addToCache(block_hash, block_height, emptyPool);
+        return emptyPool;
     }
     CAmount locked{0};
     {
@@ -177,7 +182,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
     getDataFromUnlockTxes(block->vtx, blockUnlocked, new_indexes);
     SkipSet indexes{prev.indexes};
     if (std::any_of(new_indexes.begin(), new_indexes.end(), [&](const uint64_t index) { return !indexes.add(index); })) {
-            throw std::runtime_error(strprintf("%s: failed-getcreditpool-index-exceed", __func__));
+        throw std::runtime_error(strprintf("%s: failed-getcreditpool-index-exceed", __func__));
     }
 
     const CBlockIndex* distant_block_index = block_index;
@@ -274,7 +279,6 @@ bool CreditPoolCbDiff::unlock(const CTransaction& tx, CValidationState& state)
 }
 
 bool CreditPoolCbDiff::processTransaction(const CTransaction& tx, CValidationState& state) {
-    assert(pindex);
     if (tx.nVersion != 3) return true;
     if (tx.nType != TRANSACTION_ASSET_LOCK && tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
 

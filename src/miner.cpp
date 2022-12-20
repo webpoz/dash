@@ -134,7 +134,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     bool fDIP0003Active_context = nHeight >= chainparams.GetConsensus().DIP0003Height;
     bool fDIP0008Active_context = nHeight >= chainparams.GetConsensus().DIP0008Height;
-    bool fV19Active_context = llmq::utils::IsV19Active(::ChainActive().Tip());
+    bool fV19Active_context = llmq::utils::IsV19Active(pindexPrev);
 
     pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus(), chainparams.BIP9CheckMasternodesUpgraded());
     // -regtest only: allow overriding block.nVersion with
@@ -172,9 +172,7 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     std::optional<CreditPoolCbDiff> creditPoolDiff;
     if (fV19Active_context) {
         const CreditPoolCb creditPool = creditPoolManager->getCreditPool(pindexPrev, chainparams.GetConsensus());
-        LogPrintf("CreateNewBlock(): credit pool stats. locked: %lld current limit: %lld indexes: %lld\n",
-                creditPool.locked, creditPool.currentLimit,
-                creditPool.indexes.size());
+        LogPrintf("CreateNewBlock(): CreditPoolCb is %s\n", creditPool.ToString());
         creditPoolDiff.emplace(creditPool, pindexPrev, chainparams.GetConsensus());
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolDiff);
@@ -439,6 +437,9 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
         }
 
         if (creditPoolDiff) {
+            // If one transaction is skipped due to limits, it is not a reason to interrupt
+            // whole process of adding transactions.
+            // `state` is local here because used to log info about this specific tx
             CValidationState state;
 
             if (!creditPoolDiff->processTransaction(iter->GetTx(), state)) {
@@ -446,9 +447,8 @@ void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpda
                     mapModifiedTx.get<ancestor_score>().erase(modit);
                     failedTx.insert(iter);
                 }
-                LogPrintf("asset locks tx skipped due %s txid %s\n",
-                          FormatStateMessage(state),
-                          iter->GetTx().GetHash().ToString());
+                LogPrintf("%s: asset locks tx skipped due %s txid %s\n",
+                          __func__, FormatStateMessage(state), iter->GetTx().GetHash().ToString());
                 continue;
             }
         }

@@ -25,10 +25,15 @@ namespace Consensus
     class Params;
 }
 
-// In this data structure we keep all indexes memory efficient
+// This datastructure keeps efficiently all indexes and have a strict limit for used memory
 // So far as CreditPoolCb is built only in direction from parent block to child
 // there's no need to remove elements from SkipSet ever, only add them
-struct SkipSet {
+class SkipSet {
+private:
+    std::unordered_set<uint64_t> skipped;
+    uint64_t right{0};
+    size_t capacity_limit;
+public:
     explicit SkipSet(size_t capacity_limit = 10'000)
         : capacity_limit(capacity_limit) {}
 
@@ -50,10 +55,6 @@ struct SkipSet {
         READWRITE(obj.right);
         READWRITE(obj.skipped);
     }
-private:
-    std::unordered_set<uint64_t> skipped;
-    uint64_t right{0};
-    size_t capacity_limit;
 };
 
 struct CreditPoolCb {
@@ -63,6 +64,8 @@ struct CreditPoolCb {
     CAmount currentLimit{0};
     CAmount latelyUnlocked{0};
     SkipSet indexes{};
+
+    std::string ToString() const;
 
     SERIALIZE_METHODS(CreditPoolCb, obj)
     {
@@ -75,16 +78,21 @@ struct CreditPoolCb {
     }
 };
 
-struct CreditPoolCbDiff {
+// The class CreditPoolCbDiff is used only during mining a new block to determine
+// which `Asset Unlock` transactions can be included accordingly to the Credit Pool limits
+// These extra class is needed for temporary storage of new values `lockedAmount` and `indexes`
+// while limits should stay remained and depends only on previous block
+class CreditPoolCbDiff {
+private:
+    const CreditPoolCb pool;
+    std::set<int64_t> newIndexes;
+
     CAmount sessionLocked{0};
     CAmount sessionUnlocked{0};
 
     const CBlockIndex *pindex{nullptr};
-    CreditPoolCbDiff(const CreditPoolCb& starter, const CBlockIndex *pindex, const Consensus::Params& consensusParams);
-
-    bool lock(const CTransaction& tx, CValidationState& state);
-
-    bool unlock(const CTransaction& tx, CValidationState& state);
+public:
+    explicit CreditPoolCbDiff(const CreditPoolCb& starter, const CBlockIndex *pindex, const Consensus::Params& consensusParams);
 
     // This function should be called for each Asset Lock/Unlock tx
     // to change amount of credit pool
@@ -93,9 +101,10 @@ struct CreditPoolCbDiff {
     CAmount getTotalLocked() const {
         return pool.locked + sessionLocked - sessionUnlocked;
     }
+
 private:
-    const CreditPoolCb pool;
-    std::set<int64_t> newIndexes;
+    bool lock(const CTransaction& tx, CValidationState& state);
+    bool unlock(const CTransaction& tx, CValidationState& state);
 };
 
 class CCreditPoolManager
@@ -108,12 +117,12 @@ private:
     CEvoDB& evoDb;
 
     static constexpr int DISK_SNAPSHOT_PERIOD = 576; // once per day
+
 private:
     std::optional<CreditPoolCb> getFromCache(const uint256& block_hash, int height);
     void addToCache(const uint256& block_hash, int height, const CreditPoolCb& pool);
 
 public:
-
     static constexpr int LimitBlocksToTrace = 576;
     static constexpr CAmount LimitAmountLow = 100 * COIN;
     static constexpr CAmount LimitAmountHigh = 1000 * COIN;
