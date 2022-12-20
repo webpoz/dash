@@ -46,7 +46,7 @@ Result<void, ErrReasonAndMessage> CProRegTx::IsTriviallyValid() const
         return Err{{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-operator-reward"}};
     }
 
-    return Ok<void>();
+    return {};
 }
 
 std::string CProRegTx::MakeSignString() const
@@ -92,7 +92,7 @@ Result<void, ErrReasonAndMessage> CProUpServTx::IsTriviallyValid() const
         return Err<ErrReasonAndMessage>{ValidationInvalidReason::CONSENSUS, "bad-protx-version"};
     }
 
-    return Ok<void>();
+    return {};
 }
 
 std::string CProUpServTx::ToString() const
@@ -123,7 +123,7 @@ Result<void, ErrReasonAndMessage> CProUpRegTx::IsTriviallyValid() const
     if (!scriptPayout.IsPayToPublicKeyHash() && !scriptPayout.IsPayToScriptHash()) {
         return Err{ValidationInvalidReason::TX_BAD_SPECIAL, "bad-protx-payee"};
     }
-    return Ok<void>();
+    return {};
 }
 
 std::string CProUpRegTx::ToString() const
@@ -150,7 +150,7 @@ Result<void, ErrReasonAndMessage> CProUpRevTx::IsTriviallyValid() const
     if (nReason > CProUpRevTx::REASON_LAST) {
         return Err{ValidationInvalidReason::CONSENSUS, "bad-protx-reason"};
     }
-    return Ok<void>();
+    return {};
 }
 
 std::string CProUpRevTx::ToString() const

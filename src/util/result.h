@@ -35,6 +35,8 @@ template<typename T, typename E>
 class Result {
 public:
     constexpr Result(Ok<T> val) : result{val} {}
+    template<typename... Ts>
+    constexpr Result(Ts... t) : result{Ok<T>{t...}} {}
     constexpr Result(Err<E> err) : result{err.val_} {}
 
     [[nodiscard]] constexpr bool is_ok() const { return std::holds_alternative<Ok<T>>(result); }

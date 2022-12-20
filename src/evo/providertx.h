@@ -239,7 +239,7 @@ static Result<void, ErrReasonAndMessage> CheckInputsHash(const CTransaction& tx,
         return Err<ErrReasonAndMessage>{{ValidationInvalidReason::CONSENSUS, "bad-protx-inputs-hash"}};
     }
 
-    return Ok<void>();
+    return {};
 }
 
 
