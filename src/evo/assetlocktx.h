@@ -80,8 +80,8 @@ private:
     uint64_t index{0};
     uint32_t fee{0};
     uint32_t requestedHeight{0};
-    uint256 quorumHash;
-    CBLSSignature quorumSig;
+    uint256 quorumHash{0};
+    CBLSSignature quorumSig{};
 
 public:
     CAssetUnlockPayload(uint16_t nVersion, uint64_t index, uint32_t fee, uint32_t requestedHeight,
@@ -130,8 +130,8 @@ public:
     uint64_t getIndex() const;
     uint32_t getFee() const;
     uint32_t getRequestedHeight() const;
-    uint256 getQuorumHash() const;
-    CBLSSignature getQuorumSig() const;
+    const uint256& getQuorumHash() const;
+    const CBLSSignature& getQuorumSig() const;
 
     // used by mempool to know when possible to drop a transaction as expired
     int getHeightToExpiry() const;

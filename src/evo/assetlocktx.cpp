@@ -224,11 +224,11 @@ uint32_t CAssetUnlockPayload::getRequestedHeight() const {
     return requestedHeight;
 }
 
-uint256 CAssetUnlockPayload::getQuorumHash() const {
+const uint256& CAssetUnlockPayload::getQuorumHash() const {
     return quorumHash;
 }
 
-CBLSSignature CAssetUnlockPayload::getQuorumSig() const {
+const CBLSSignature& CAssetUnlockPayload::getQuorumSig() const {
     return quorumSig;
 }
 
