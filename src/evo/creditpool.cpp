@@ -55,43 +55,42 @@ static void getDataFromUnlockTxes(const std::vector<CTransactionRef>& vtx, CAmou
     }
 }
 
-bool SkipSet::add(uint64_t value) {
+bool CSkipSet::add(uint64_t value) {
     assert(!contains(value));
 
     if (auto it = skipped.find(value); it != skipped.end()) {
         skipped.erase(it);
     } else {
-        assert(right <= value);
+        assert(current_max <= value);
 
-        if (capacity() + value - right > capacity_limit) {
-            LogPrintf("SkipSet::add failed due to capacity exceeded: requested %lld to %lld while limit is %lld\n",
-                    value - right, capacity(), capacity_limit);
+        if (capacity() + value - current_max > capacity_limit) {
+            LogPrintf("CSkipSet::add failed due to capacity exceeded: requested %lld to %lld while limit is %lld\n",
+                    value - current_max, capacity(), capacity_limit);
             return false;
         }
-        for (uint64_t index = right; index < value; ++index) {
+        for (uint64_t index = current_max; index < value; ++index) {
             bool insert_ret = skipped.insert(index).second;
             assert(insert_ret);
         }
-        right = value + 1;
+        current_max = value + 1;
     }
     return true;
 }
 
-bool SkipSet::canBeAdded(uint64_t value, CValidationState& state) const {
-    if (contains(value)) {
-        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-duplicated-index");
-    }
+bool CSkipSet::canBeAdded(uint64_t value) const {
+    if (contains(value)) return false;
+
     if (skipped.find(value) != skipped.end()) return true;
 
-    if (capacity() + value - right > capacity_limit) {
-        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-getcbforblock-index-exceed");
+    if (capacity() + value - current_max > capacity_limit) {
+        return false;
     }
 
     return true;
 }
 
-bool SkipSet::contains(uint64_t value) const {
-    if (right <= value) return false;
+bool CSkipSet::contains(uint64_t value) const {
+    if (current_max <= value) return false;
     return skipped.find(value) == skipped.end();
 }
 
@@ -180,7 +179,7 @@ CCreditPool CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, co
     CAmount blockUnlocked{0};
     std::unordered_set<uint64_t> new_indexes;
     getDataFromUnlockTxes(block->vtx, blockUnlocked, new_indexes);
-    SkipSet indexes{prev.indexes};
+    CSkipSet indexes{prev.indexes};
     if (std::any_of(new_indexes.begin(), new_indexes.end(), [&](const uint64_t index) { return !indexes.add(index); })) {
         throw std::runtime_error(strprintf("%s: failed-getcreditpool-index-exceed", __func__));
     }
@@ -265,11 +264,12 @@ bool CCreditPoolDiff::unlock(const CTransaction& tx, CValidationState& state)
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unloock-too-much");
     }
 
-    if (!pool.indexes.canBeAdded(index, state)) {
-        return false;
-    }
-    if (newIndexes.count(index)) {
+    if (pool.indexes.contains(index) || newIndexes.count(index)) {
         return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-duplicated-index");
+    }
+
+    if (!pool.indexes.canBeAdded(index)) {
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-getcbforblock-index-exceed");
     }
 
     newIndexes.insert(index);

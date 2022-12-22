@@ -27,33 +27,33 @@ namespace Consensus
 
 // This datastructure keeps efficiently all indexes and have a strict limit for used memory
 // So far as CCreditPool is built only in direction from parent block to child
-// there's no need to remove elements from SkipSet ever, only add them
-class SkipSet {
+// there's no need to remove elements from CSkipSet ever, only add them
+class CSkipSet {
 private:
     std::unordered_set<uint64_t> skipped;
-    uint64_t right{0};
+    uint64_t current_max{0};
     size_t capacity_limit;
 public:
-    explicit SkipSet(size_t capacity_limit = 10'000) :
+    explicit CSkipSet(size_t capacity_limit = 10'000) :
         capacity_limit(capacity_limit)
     {}
 
     [[nodiscard]] bool add(uint64_t value);
 
-    bool canBeAdded(uint64_t value, CValidationState& state) const;
+    bool canBeAdded(uint64_t value) const;
 
     bool contains(uint64_t value) const;
 
     size_t size() const {
-        return right - skipped.size();
+        return current_max - skipped.size();
     }
     size_t capacity() const {
         return skipped.size();
     }
 
-    SERIALIZE_METHODS(SkipSet, obj)
+    SERIALIZE_METHODS(CSkipSet, obj)
     {
-        READWRITE(obj.right);
+        READWRITE(obj.current_max);
         READWRITE(obj.skipped);
     }
 };
@@ -64,7 +64,7 @@ struct CCreditPool {
     // needs for logic of limits of unlocks
     CAmount currentLimit{0};
     CAmount latelyUnlocked{0};
-    SkipSet indexes{};
+    CSkipSet indexes{};
 
     std::string ToString() const;
 
