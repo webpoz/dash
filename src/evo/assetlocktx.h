@@ -15,7 +15,7 @@
 #include <univalue.h>
 
 class CBlockIndex;
-class CreditPoolCb;
+class CCreditPool;
 
 class CAssetLockPayload
 {
@@ -29,8 +29,9 @@ private:
     std::vector<CTxOut> creditOutputs;
 
 public:
-    CAssetLockPayload(uint16_t nType, const std::vector<CTxOut>& creditOutputs)
-        : nType(nType), creditOutputs(creditOutputs)
+    CAssetLockPayload(uint16_t nType, const std::vector<CTxOut>& creditOutputs) :
+        nType(nType),
+        creditOutputs(creditOutputs)
     {}
 
     CAssetLockPayload() = default;
@@ -84,13 +85,13 @@ private:
 
 public:
     CAssetUnlockPayload(uint16_t nVersion, uint64_t index, uint32_t fee, uint32_t requestedHeight,
-            uint256 quorumHash, CBLSSignature quorumSig)
-    : nVersion(nVersion),
-    index(index),
-    fee(fee),
-    requestedHeight(requestedHeight),
-    quorumHash(quorumHash),
-    quorumSig(quorumSig)
+            uint256 quorumHash, CBLSSignature quorumSig) :
+        nVersion(nVersion),
+        index(index),
+        fee(fee),
+        requestedHeight(requestedHeight),
+        quorumHash(quorumHash),
+        quorumSig(quorumSig)
     {}
 
     CAssetUnlockPayload() = default;
@@ -138,7 +139,7 @@ public:
 };
 
 maybe_error CheckAssetLockTx(const CTransaction& tx);
-maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CreditPoolCb& creditPool);
-maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CreditPoolCb& creditPool);
+maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CCreditPool& creditPool);
+maybe_error CheckAssetLockUnlockTx(const CTransaction& tx, const CBlockIndex* pindexPrev, const CCreditPool& creditPool);
 
 #endif // BITCOIN_EVO_ASSETLOCKTX_H

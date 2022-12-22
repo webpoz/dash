@@ -15,6 +15,7 @@
 #include <hash.h>
 #include <llmq/blockprocessor.h>
 #include <llmq/commitment.h>
+#include <llmq/utils.h>
 #include <primitives/block.h>
 #include <validation.h>
 
@@ -47,7 +48,7 @@ bool CheckSpecialTx(const CTransaction& tx, const CBlockIndex* pindexPrev, CVali
             return VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_DIP0024) == ThresholdState::ACTIVE && CheckMNHFTx(tx, pindexPrev, state);
         case TRANSACTION_ASSET_LOCK:
         case TRANSACTION_ASSET_UNLOCK:
-            if (VersionBitsTipState(Params().GetConsensus(), Consensus::DEPLOYMENT_V19) != ThresholdState::ACTIVE) {
+            if (!llmq::utils::IsV19Active(pindexPrev)) {
                 return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "v19-not-active");
             }
             if (auto maybeError = CheckAssetLockUnlockTx(tx, pindexPrev, creditPoolManager->getCreditPool(pindexPrev, Params().GetConsensus())); maybeError.did_err) {

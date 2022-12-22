@@ -169,10 +169,10 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
     int nPackagesSelected = 0;
     int nDescendantsUpdated = 0;
 
-    std::optional<CreditPoolCbDiff> creditPoolDiff;
+    std::optional<CCreditPoolDiff> creditPoolDiff;
     if (fV19Active_context) {
-        const CreditPoolCb creditPool = creditPoolManager->getCreditPool(pindexPrev, chainparams.GetConsensus());
-        LogPrintf("CreateNewBlock(): CreditPoolCb is %s\n", creditPool.ToString());
+        const CCreditPool creditPool = creditPoolManager->getCreditPool(pindexPrev, chainparams.GetConsensus());
+        LogPrintf("CreateNewBlock(): CCreditPool is %s\n", creditPool.ToString());
         creditPoolDiff.emplace(creditPool, pindexPrev, chainparams.GetConsensus());
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolDiff);
@@ -379,7 +379,7 @@ void BlockAssembler::SortForBlock(const CTxMemPool::setEntries& package, std::ve
 // Each time through the loop, we compare the best transaction in
 // mapModifiedTxs with the next transaction in the mempool to decide what
 // transaction package to work on next.
-void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CreditPoolCbDiff>& creditPoolDiff)
+void BlockAssembler::addPackageTxs(int &nPackagesSelected, int &nDescendantsUpdated, std::optional<CCreditPoolDiff>& creditPoolDiff)
 {
     AssertLockHeld(m_mempool.cs);
 

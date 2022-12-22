@@ -2036,7 +2036,6 @@ bool AppInitMain(const CoreContext& context, NodeContext& node, interfaces::Bloc
                 // Same logic as above with pblocktree
                 deterministicMNManager.reset();
                 deterministicMNManager.reset(new CDeterministicMNManager(*node.evodb, *node.connman));
-                creditPoolManager.reset();
                 creditPoolManager.reset(new CCreditPoolManager(*node.evodb));
                 llmq::quorumSnapshotManager.reset();
                 llmq::quorumSnapshotManager.reset(new llmq::CQuorumSnapshotManager(*node.evodb));

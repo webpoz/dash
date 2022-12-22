@@ -277,7 +277,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
     BOOST_CHECK(state.IsValid());
 
     const CBlockIndex *block_index = ::ChainActive().Tip();
-    CreditPoolCb pool;
+    CCreditPool pool;
     BOOST_CHECK(CheckAssetUnlockTx(CTransaction(tx), block_index, pool).error_str == "bad-assetunlock-quorum-hash");
 
     {

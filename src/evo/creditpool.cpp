@@ -40,7 +40,7 @@ static bool getDataFromUnlockTx(const CTransaction& tx, CAmount& toUnlock, uint6
 }
 
 // throws exception if anything went wrong
-static void getDataFromUnlockTxes(const std::vector<CTransactionRef>& vtx, CAmount& totalUnlocked, std::set<uint64_t>& indexes) {
+static void getDataFromUnlockTxes(const std::vector<CTransactionRef>& vtx, CAmount& totalUnlocked, std::unordered_set<uint64_t>& indexes) {
     for (CTransactionRef tx : vtx) {
         if (tx->nVersion != 3 || tx->nType != TRANSACTION_ASSET_UNLOCK) continue;
 
@@ -95,13 +95,13 @@ bool SkipSet::contains(uint64_t value) const {
     return skipped.find(value) == skipped.end();
 }
 
-std::string CreditPoolCb::ToString() const {
-    return strprintf("CreditPoolCb(locked=%lld,currentLimit=%lld,nIndexes=%lld)",
+std::string CCreditPool::ToString() const {
+    return strprintf("CCreditPool(locked=%lld,currentLimit=%lld,nIndexes=%lld)",
             locked, currentLimit, indexes.size());
 }
 
-std::optional<CreditPoolCb> CCreditPoolManager::getFromCache(const uint256& block_hash, int height) {
-    CreditPoolCb pool;
+std::optional<CCreditPool> CCreditPoolManager::getFromCache(const uint256& block_hash, int height) {
+    CCreditPool pool;
     {
         LOCK(cs_cache);
         if (creditPoolCache.get(block_hash, pool)) {
@@ -118,7 +118,7 @@ std::optional<CreditPoolCb> CCreditPoolManager::getFromCache(const uint256& bloc
     return std::nullopt;
 }
 
-void CCreditPoolManager::addToCache(const uint256& block_hash, int height, const CreditPoolCb &pool) {
+void CCreditPoolManager::addToCache(const uint256& block_hash, int height, const CCreditPool &pool) {
     {
         LOCK(cs_cache);
         creditPoolCache.insert(block_hash, pool);
@@ -144,7 +144,7 @@ static std::optional<CBlock> getBlockForCreditPool(const CBlockIndex *block_inde
     return block;
 }
 
-CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, const Consensus::Params& consensusParams)
+CCreditPool CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, const Consensus::Params& consensusParams)
 {
     bool isDIP0027AssetLocksActive = llmq::utils::IsV19Active(block_index);
     if (!isDIP0027AssetLocksActive) {
@@ -158,14 +158,14 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
         if (pool) { return pool.value(); }
     }
 
-    CreditPoolCb prev = getCreditPool(block_index->pprev, consensusParams);
+    CCreditPool prev = getCreditPool(block_index->pprev, consensusParams);
 
     std::optional<CBlock> block = getBlockForCreditPool(block_index, consensusParams);
     if (!block) {
         assert(prev.locked == 0);
         assert(prev.indexes.size() == 0);
 
-        CreditPoolCb emptyPool;
+        CCreditPool emptyPool;
         addToCache(block_hash, block_height, emptyPool);
         return emptyPool;
     }
@@ -178,7 +178,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
         locked = cbTx.assetLockedAmount;
     }
     CAmount blockUnlocked{0};
-    std::set<uint64_t> new_indexes;
+    std::unordered_set<uint64_t> new_indexes;
     getDataFromUnlockTxes(block->vtx, blockUnlocked, new_indexes);
     SkipSet indexes{prev.indexes};
     if (std::any_of(new_indexes.begin(), new_indexes.end(), [&](const uint64_t index) { return !indexes.add(index); })) {
@@ -193,7 +193,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
     CAmount distantUnlocked{0};
     if (distant_block_index) {
         if (std::optional<CBlock> distant_block = getBlockForCreditPool(distant_block_index, consensusParams); distant_block) {
-            std::set<uint64_t> indexes_tmp;
+            std::unordered_set<uint64_t> indexes_tmp;
             getDataFromUnlockTxes(distant_block->vtx, distantUnlocked, indexes_tmp);
         }
     }
@@ -215,7 +215,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
                latelyUnlocked / COIN, latelyUnlocked % COIN);
     }
 
-    CreditPoolCb pool{locked, currentLimit, latelyUnlocked, indexes};
+    CCreditPool pool{locked, currentLimit, latelyUnlocked, indexes};
     addToCache(block_hash, block_height, pool);
     return pool;
 }
@@ -226,15 +226,15 @@ CCreditPoolManager::CCreditPoolManager(CEvoDB& _evoDb)
 {
 }
 
-CreditPoolCbDiff::CreditPoolCbDiff(const CreditPoolCb& starter, const CBlockIndex *pindex, const Consensus::Params& consensusParams)
-: pool(starter)
-, pindex(pindex)
+CCreditPoolDiff::CCreditPoolDiff(const CCreditPool& starter, const CBlockIndex *pindex, const Consensus::Params& consensusParams) :
+    pool(starter),
+    pindex(pindex)
 {
     assert(pindex);
 }
 
 
-bool CreditPoolCbDiff::lock(const CTransaction& tx, CValidationState& state)
+bool CCreditPoolDiff::lock(const CTransaction& tx, CValidationState& state)
 {
     CAssetLockPayload assetLockTx;
     if (!GetTxPayload(tx, assetLockTx)) {
@@ -252,7 +252,7 @@ bool CreditPoolCbDiff::lock(const CTransaction& tx, CValidationState& state)
     return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-lock-invalid");
 }
 
-bool CreditPoolCbDiff::unlock(const CTransaction& tx, CValidationState& state)
+bool CCreditPoolDiff::unlock(const CTransaction& tx, CValidationState& state)
 {
     uint64_t index{0};
     CAmount toUnlock{0};
@@ -277,7 +277,7 @@ bool CreditPoolCbDiff::unlock(const CTransaction& tx, CValidationState& state)
     return true;
 }
 
-bool CreditPoolCbDiff::processTransaction(const CTransaction& tx, CValidationState& state) {
+bool CCreditPoolDiff::processTransaction(const CTransaction& tx, CValidationState& state) {
     if (tx.nVersion != 3) return true;
     if (tx.nType != TRANSACTION_ASSET_LOCK && tx.nType != TRANSACTION_ASSET_UNLOCK) return true;
 
