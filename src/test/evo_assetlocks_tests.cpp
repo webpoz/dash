@@ -31,11 +31,14 @@ SetupDummyInputs(FillableSigningProvider& keystoreRet, CCoinsViewCache& coinsRet
     dummyTransactions.resize(2);
 
     // Add some keys to the keystore:
-    CKey key[4];
-    for (int i = 0; i < 4; i++)
+    std::array<CKey, 4> key;
     {
-        key[i].MakeNewKey(i % 2);
-        keystoreRet.AddKey(key[i]);
+        bool flip = true;
+        for (auto& k : key) {
+            k.MakeNewKey(flip);
+            keystoreRet.AddKey(k);
+            flip = !flip;
+        }
     }
 
     // Create some dummy input transactions
@@ -91,9 +94,11 @@ static CMutableTransaction CreateAssetLockTx(FillableSigningProvider& keystore, 
 static CMutableTransaction CreateAssetUnlockTx(FillableSigningProvider& keystore, CKey& key)
 {
     int nVersion = 1;
+    // just a big number bigger than uint32_t
     uint64_t index = 0x001122334455667788L;
     CAmount fee = CENT;
-    uint32_t requestedHeight = 1;
+    // just big enough to overflow uint16_t
+    uint32_t requestedHeight = 1000'000;
     uint256 quorumHash;
     CBLSSignature quorumSig;
     CAssetUnlockPayload assetUnlockTx(nVersion, index, fee, requestedHeight, quorumHash, quorumSig);
@@ -295,6 +300,13 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
     // Check version
     BOOST_CHECK(tx.nVersion == 2);
     {
+        CAssetUnlockPayload unlockPayload;
+        GetTxPayload(tx, unlockPayload);
+        BOOST_CHECK(unlockPayload.getVersion() == 1);
+        BOOST_CHECK(unlockPayload.getRequestedHeight() == 1000'000);
+        BOOST_CHECK(unlockPayload.getFee() == CENT);
+        BOOST_CHECK(unlockPayload.getIndex() == 0x001122334455667788L);
+
         // Wrong type "Asset Lock TX" instead "Asset Unlock TX"
         CMutableTransaction txWrongType = tx;
         txWrongType.nType = TRANSACTION_ASSET_LOCK;

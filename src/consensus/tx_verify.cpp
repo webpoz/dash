@@ -162,8 +162,7 @@ unsigned int GetTransactionSigOpCount(const CTransaction& tx, const CCoinsViewCa
 bool Consensus::CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoinsViewCache& inputs, int nSpendHeight, CAmount& txfee)
 {
 
-    bool isAssetUnlockTx = (tx.nVersion == 3 && tx.nType ==  TRANSACTION_ASSET_UNLOCK);
-    if (isAssetUnlockTx) {
+    if (bool isAssetUnlockTx = (tx.nVersion == 3 && tx.nType ==  TRANSACTION_ASSET_UNLOCK); isAssetUnlockTx) {
         CAssetUnlockPayload assetUnlockTx;
         if (!GetTxPayload(tx, assetUnlockTx)) {
             return state.Invalid(ValidationInvalidReason::TX_BAD_SPECIAL, false, REJECT_INVALID, "bad-assetunlocktx-payload");
