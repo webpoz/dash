@@ -267,9 +267,9 @@ class AssetLocksTest(DashTestFramework):
         asset_unlock_tx = create_assetunlock(node, self.mninfo, 101, COIN, pubkey)
         asset_unlock_tx_late = create_assetunlock(node, self.mninfo, 102, COIN, pubkey)
         asset_unlock_tx_too_late = create_assetunlock(node, self.mninfo, 103, COIN, pubkey)
-        asset_unlock_tx_inactive_quorum = create_assetunlock(node, self.mninfo, 104, COIN, pubkey)
         asset_unlock_tx_duplicate_index = copy.deepcopy(asset_unlock_tx)
         asset_unlock_tx_duplicate_index.vout[0].nValue += COIN
+        too_late_height = node.getblock(node.getbestblockhash())["height"] + 48
 
         self.check_mempool_result(tx=asset_unlock_tx, result_expected={'allowed': True})
         self.check_mempool_result(tx=asset_unlock_tx_duplicate_index,
@@ -320,14 +320,16 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), locked_1 - 3 * COIN)
 
         # generate many blocks to make quorum far behind (even still active)
-        self.slowly_generate_batch(60)
-
+        self.slowly_generate_batch(too_late_height - node.getblock(node.getbestblockhash())["height"] - 1)
+        self.check_mempool_result(tx=asset_unlock_tx_too_late, result_expected={'allowed': True})
+        node.generate(1)
+        self.sync_all()
         self.check_mempool_result(tx=asset_unlock_tx_too_late,
                 result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-too-late'})
 
-        # two quorums later is too late
+        # two quorums later is too late because quorum is not active, reason should not be same
         self.mine_quorum()
-        self.check_mempool_result(tx=asset_unlock_tx_inactive_quorum,
+        self.check_mempool_result(tx=asset_unlock_tx_too_late,
                 result_expected={'allowed': False, 'reject-reason' : '16: bad-assetunlock-not-active-quorum'})
 
         block_to_reconsider = node.getbestblockhash()

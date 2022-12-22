@@ -129,7 +129,6 @@ maybe_error CAssetUnlockPayload::VerifySig(const uint256& msgHash, const CBlockI
     const auto& llmq_params = llmq::GetLLMQParams(llmqType);
 
     // We check at most 2 quorums, so, count is equal to 2
-    // TODO: update it after choosing proper consensus.llmqTypeAssetLocks (see comment there)
     const int count = 2;
     auto quorums = llmq::quorumManager->ScanQuorums(llmqType, pindexTip, count > -1 ? count : llmq_params.signingActiveQuorumCount);
     bool isActive = std::any_of(quorums.begin(), quorums.end(), [&](const auto &q) { return q->qc->quorumHash == quorumHash; });
@@ -233,11 +232,6 @@ const CBLSSignature& CAssetUnlockPayload::getQuorumSig() const {
 }
 
 int CAssetUnlockPayload::getHeightToExpiry() const {
-    Consensus::LLMQType llmqType = Params().GetConsensus().llmqTypeAssetLocks;
-
-    assert(Params().HasLLMQ(llmqType));
-
-    int signOffset{llmq::GetLLMQParams(llmqType).dkgInterval};
-    // round up withing current and next quorum
-    return requestedHeight + 2 * signOffset - requestedHeight % signOffset - 1;
+    int expiryHeight = 48;
+    return requestedHeight + expiryHeight;
 }
