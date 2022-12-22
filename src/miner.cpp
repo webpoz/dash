@@ -171,9 +171,9 @@ std::unique_ptr<CBlockTemplate> BlockAssembler::CreateNewBlock(const CScript& sc
 
     std::optional<CCreditPoolDiff> creditPoolDiff;
     if (fV19Active_context) {
-        const CCreditPool creditPool = creditPoolManager->getCreditPool(pindexPrev, chainparams.GetConsensus());
+        CCreditPool creditPool = creditPoolManager->getCreditPool(pindexPrev, chainparams.GetConsensus());
         LogPrintf("CreateNewBlock(): CCreditPool is %s\n", creditPool.ToString());
-        creditPoolDiff.emplace(creditPool, pindexPrev, chainparams.GetConsensus());
+        creditPoolDiff.emplace(std::move(creditPool), pindexPrev, chainparams.GetConsensus());
     }
     addPackageTxs(nPackagesSelected, nDescendantsUpdated, creditPoolDiff);
 
