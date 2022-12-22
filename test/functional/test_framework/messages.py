@@ -1144,7 +1144,7 @@ class CAssetUnlockTx:
     def deserialize(self, f):
         self.version = struct.unpack("<H", f.read(2))[0]
         self.index = struct.unpack("<Q", f.read(8))[0]
-        self.fee = struct.unpack("<Q", f.read(8))[0]
+        self.fee = struct.unpack("<I", f.read(4))[0]
         self.requestedHeight = struct.unpack("<I", f.read(4))[0]
         self.quorumHash = deser_uint256(f)
         self.quorumSig = f.read(96)
@@ -1153,7 +1153,7 @@ class CAssetUnlockTx:
         r = b""
         r += struct.pack("<H", self.version)
         r += struct.pack("<Q", self.index)
-        r += struct.pack("<Q", self.fee)
+        r += struct.pack("<I", self.fee)
         r += struct.pack("<I", self.requestedHeight)
         r += ser_uint256(self.quorumHash)
         r += self.quorumSig

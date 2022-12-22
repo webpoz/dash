@@ -192,8 +192,7 @@ CreditPoolCb CCreditPoolManager::getCreditPool(const CBlockIndex* block_index, c
     }
     CAmount distantUnlocked{0};
     if (distant_block_index) {
-        std::optional<CBlock> distant_block = getBlockForCreditPool(distant_block_index, consensusParams);
-        if (distant_block) {
+        if (std::optional<CBlock> distant_block = getBlockForCreditPool(distant_block_index, consensusParams); distant_block) {
             std::set<uint64_t> indexes_tmp;
             getDataFromUnlockTxes(distant_block->vtx, distantUnlocked, indexes_tmp);
         }

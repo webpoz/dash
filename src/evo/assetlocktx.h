@@ -77,13 +77,13 @@ public:
 private:
     uint16_t nVersion{CURRENT_VERSION};
     uint64_t index{0};
-    CAmount fee{0};
+    uint32_t fee{0};
     uint32_t requestedHeight{0};
     uint256 quorumHash;
     CBLSSignature quorumSig;
 
 public:
-    CAssetUnlockPayload(uint16_t nVersion, uint64_t index, CAmount fee, uint32_t requestedHeight,
+    CAssetUnlockPayload(uint16_t nVersion, uint64_t index, uint32_t fee, uint32_t requestedHeight,
             uint256 quorumHash, CBLSSignature quorumSig)
     : nVersion(nVersion),
     index(index),
@@ -127,7 +127,7 @@ public:
     uint16_t getVersion() const;
     uint16_t getType() const;
     uint64_t getIndex() const;
-    CAmount getFee() const;
+    uint32_t getFee() const;
     uint32_t getRequestedHeight() const;
     uint256 getQuorumHash() const;
     CBLSSignature getQuorumSig() const;

@@ -184,10 +184,6 @@ maybe_error CheckAssetUnlockTx(const CTransaction& tx, const CBlockIndex* pindex
         return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-assetunlocktx-version"};
     }
 
-    if (assetUnlockTx.getFee() <= 0) {
-        return {ValidationInvalidReason::TX_BAD_SPECIAL, "bad-assetunlocktx-negative-fee"};
-    }
-
     if (creditPool.indexes.contains(assetUnlockTx.getIndex())) {
         return {ValidationInvalidReason::CONSENSUS, "bad-assetunlock-duplicated-index"};
     }
@@ -220,7 +216,7 @@ uint64_t CAssetUnlockPayload::getIndex() const {
     return index;
 }
 
-CAmount CAssetUnlockPayload::getFee() const {
+uint32_t CAssetUnlockPayload::getFee() const {
     return fee;
 }
 

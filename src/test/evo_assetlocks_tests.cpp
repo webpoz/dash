@@ -96,7 +96,8 @@ static CMutableTransaction CreateAssetUnlockTx(FillableSigningProvider& keystore
     int nVersion = 1;
     // just a big number bigger than uint32_t
     uint64_t index = 0x001122334455667788L;
-    CAmount fee = CENT;
+    // big enough to overflow int32_t
+    uint32_t fee = 2000'000'000u;
     // just big enough to overflow uint16_t
     uint32_t requestedHeight = 1000'000;
     uint256 quorumHash;
@@ -304,7 +305,7 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
         GetTxPayload(tx, unlockPayload);
         BOOST_CHECK(unlockPayload.getVersion() == 1);
         BOOST_CHECK(unlockPayload.getRequestedHeight() == 1000'000);
-        BOOST_CHECK(unlockPayload.getFee() == CENT);
+        BOOST_CHECK(unlockPayload.getFee() == 2000'000'000u);
         BOOST_CHECK(unlockPayload.getIndex() == 0x001122334455667788L);
 
         // Wrong type "Asset Lock TX" instead "Asset Unlock TX"
@@ -318,16 +319,6 @@ BOOST_FIXTURE_TEST_CASE(evo_assetunlock, TestChain100Setup)
 
         // Version of payload is not `1`
         CMutableTransaction txWrongVersion = tx;
-    }
-
-    {
-        // Negative fee
-        CMutableTransaction txNegativeFee = tx;
-
-        CAssetUnlockPayload assetUnlockNegativeFee(1, 1, -CENT, 1, {}, {});
-        SetTxPayload(txNegativeFee, assetUnlockNegativeFee);
-
-        BOOST_CHECK(CheckAssetUnlockTx(CTransaction(txNegativeFee), block_index, pool).error_str == "bad-assetunlocktx-negative-fee");
     }
 
     {
