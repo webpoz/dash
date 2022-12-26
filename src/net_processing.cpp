@@ -935,7 +935,7 @@ void PeerLogicValidation::ReattemptInitialBroadcast(CScheduler& scheduler) const
 
     // schedule next run for 10-15 minutes in the future
     const std::chrono::milliseconds delta = std::chrono::minutes{10} + GetRandMillis(std::chrono::minutes{5});
-    scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta.count());
+    scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta);
 }
 
 void PeerLogicValidation::FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
@@ -1288,7 +1288,7 @@ PeerLogicValidation::PeerLogicValidation(CConnman* connmanIn, BanMan* banman, CS
 
     // schedule next run for 10-15 minutes in the future
     const std::chrono::milliseconds delta = std::chrono::minutes{10} + GetRandMillis(std::chrono::minutes{5});
-    scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta.count());
+    scheduler.scheduleFromNow([&] { ReattemptInitialBroadcast(scheduler); }, delta);
 }
 
 /**
