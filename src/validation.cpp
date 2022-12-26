@@ -51,6 +51,7 @@
 
 #include <masternode/payments.h>
 
+#include <evo/creditpool.h>
 #include <evo/evodb.h>
 #include <evo/specialtx.h>
 #include <evo/specialtxman.h>
@@ -600,6 +601,7 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
 
+        CCreditPool creditPool = creditPoolManager->getCreditPool(::ChainActive().Tip(), chainparams.GetConsensus());
         LockPoints lp;
         CCoinsViewCache& coins_cache = ::ChainstateActive().CoinsTip();
         CCoinsViewMemPool viewMemPool(&coins_cache, pool);
@@ -724,7 +726,7 @@ static bool AcceptToMemoryPoolWorker(const CChainParams& chainparams, CTxMemPool
         // DoS scoring a node for non-critical errors, e.g. duplicate keys because a TX is received that was already
         // mined
         // NOTE: we use UTXO here and do NOT allow mempool txes as masternode collaterals
-        if (!CheckSpecialTx(tx, ::ChainActive().Tip(), state, ::ChainstateActive().CoinsTip(), true))
+        if (!CheckSpecialTx(tx, ::ChainActive().Tip(), ::ChainstateActive().CoinsTip(), creditPool, true, state))
             return false;
 
         if (pool.existsProviderTxConflict(tx)) {
