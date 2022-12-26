@@ -79,10 +79,17 @@ struct CCreditPool {
     }
 };
 
-// The class CCreditPoolDiff is used only during mining a new block to determine
-// which `Asset Unlock` transactions can be included accordingly to the Credit Pool limits
-// These extra class is needed for temporary storage of new values `lockedAmount` and `indexes`
-// while limits should stay remained and depends only on previous block
+/**
+ * The class CCreditPoolDiff has 2 purposes:
+ *  - it helps to determine which transaction can be included in new mined block
+ *  within current limits for Asset Unlock transactions and filter duplicated indexes
+ *  - to validate Asset Unlock transaction in mined block. The standalone checks of tx
+ *  such as CheckSpecialTx is not able to do so because at that moment there is no full
+ *  information about Credit Pool limits.
+ *
+ * CCreditPoolDiff temporary stores new values `lockedAmount` and `indexes` while
+ * limits should stay same and depends only on the previous block.
+ */
 class CCreditPoolDiff {
 private:
     const CCreditPool pool;
@@ -95,8 +102,11 @@ private:
 public:
     explicit CCreditPoolDiff(CCreditPool starter, const CBlockIndex *pindex, const Consensus::Params& consensusParams);
 
-    // This function should be called for each Asset Lock/Unlock tx
-    // to change amount of credit pool
+    /**
+     * This function should be called for each Asset Lock/Unlock tx
+     * to change amount of credit pool
+     * @return true if transaction can be included in this block
+     */
     bool processTransaction(const CTransaction& tx, CValidationState& state);
 
     CAmount getTotalLocked() const {

@@ -117,7 +117,8 @@ bool UndoSpecialTx(const CTransaction& tx, const CBlockIndex* pindex)
 }
 
 bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, llmq::CQuorumBlockProcessor& quorum_block_processor,
-                              CValidationState& state, const CCoinsViewCache& view, bool fJustCheck, bool fCheckCbTxMerleRoots)
+                              const Consensus::Params& consensusParams, const CCoinsViewCache& view, bool fJustCheck, bool fCheckCbTxMerleRoots,
+                              CValidationState& state)
 {
     AssertLockHeld(cs_main);
 
@@ -129,12 +130,23 @@ bool ProcessSpecialTxsInBlock(const CBlock& block, const CBlockIndex* pindex, ll
 
         int64_t nTime1 = GetTimeMicros();
 
+        std::optional<CCreditPoolDiff> creditPoolDiff;
+        if (bool fV19Active_context = llmq::utils::IsV19Active(pindex->pprev); fV19Active_context) {
+            CCreditPool creditPool = creditPoolManager->getCreditPool(pindex->pprev, consensusParams);
+            LogPrintf("%s: CCreditPool is %s\n", __func__, creditPool.ToString());
+            creditPoolDiff.emplace(std::move(creditPool), pindex->pprev, consensusParams);
+        }
+
         for (const auto& ptr_tx : block.vtx) {
             if (!CheckSpecialTx(*ptr_tx, pindex->pprev, state, view, fCheckCbTxMerleRoots)) {
                 // pass the state returned by the function above
                 return false;
             }
             if (!ProcessSpecialTx(*ptr_tx, pindex, state)) {
+                // pass the state returned by the function above
+                return false;
+            }
+            if (creditPoolDiff && !creditPoolDiff->processTransaction(*ptr_tx, state)) {
                 // pass the state returned by the function above
                 return false;
             }

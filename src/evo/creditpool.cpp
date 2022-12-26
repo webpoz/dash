@@ -284,7 +284,7 @@ bool CCreditPoolDiff::unlock(const CTransaction& tx, CValidationState& state)
     }
 
     if (sessionUnlocked + toUnlock > pool.currentLimit) {
-        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unloock-too-much");
+        return state.Invalid(ValidationInvalidReason::CONSENSUS, false, REJECT_INVALID, "failed-creditpool-unlock-too-much");
     }
 
     if (pool.indexes.contains(index) || newIndexes.count(index)) {

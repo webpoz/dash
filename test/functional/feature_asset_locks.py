@@ -142,6 +142,23 @@ class AssetLocksTest(DashTestFramework):
         assert_equal([result_expected], result_test)
         self.check_mempool_size()
 
+    def create_and_check_block(self, tx, expected_error = None):
+        node = self.nodes[0]
+        best_block_hash = node.getbestblockhash()
+        best_block = node.getblock(best_block_hash)
+        tip = int(best_block_hash, 16)
+        height = best_block["height"] + 1
+        block_time = best_block["time"] + 1
+
+        cbb = create_coinbase(height, dip4_activated=True, v19_activated=True)
+        block = create_block(tip, cbb, block_time, version=3)
+        block.vtx.append(tx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.solve()
+        result = node.submitblock(block.serialize().hex())
+        if result != expected_error:
+            raise AssertionError('mining the block should have failed with error %s, but submitblock returned %s' % (expected_error, result))
+
     def set_sporks(self):
         spork_enabled = 0
         spork_disabled = 4070908800
@@ -345,25 +362,7 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), locked_1 - 3 * COIN)
 
         # Forcibly mine asset_unlock_tx_too_late and ensure block is invalid
-        hh = node.getbestblockhash()
-        best_block = node.getblock(hh)
-        tip = int(node.getbestblockhash(), 16)
-        height = best_block["height"] + 1
-        block_time = best_block["time"] + 1
-
-
-        cbb = create_coinbase(height, dip4_activated=True, v19_activated=True)
-        block = create_block(tip, cbb, block_time, version=3)
-        block.vtx.append(asset_unlock_tx_too_late)
-        block.hashMerkleRoot = block.calc_merkle_root()
-        block.solve()
-        result = node.submitblock(block.serialize().hex())
-        # Expect an error here
-        expected_error = "bad-assetunlock-not-active-quorum"
-        if result != expected_error:
-            raise AssertionError('mining the block should have failed with error %s, but submitblock returned %s' % (expected_error, result))
-
-        # ----
+        self.create_and_check_block(asset_unlock_tx_too_late, expected_error = "bad-assetunlock-not-active-quorum")
 
         node.generate(1)
         self.sync_all()
@@ -384,6 +383,9 @@ class AssetLocksTest(DashTestFramework):
 
         self.ensure_tx_is_not_mined(txid_in_block)
 
+        # Forcibly mine asset_unlock_tx_full and ensure block is invalid
+        self.create_and_check_block(asset_unlock_tx_full, expected_error = "failed-creditpool-unlock-too-much")
+
         self.mempool_size += 1
         asset_unlock_tx_full = create_assetunlock(node, self.mninfo, 301, get_credit_pool_amount(node), pubkey)
         self.check_mempool_result(tx=asset_unlock_tx_full, result_expected={'allowed': True })
@@ -397,11 +399,12 @@ class AssetLocksTest(DashTestFramework):
         assert_equal(get_credit_pool_amount(node), 0)
 
         # after many blocks duplicated tx still should not be mined
-        try:
-            node.sendrawtransaction(hexstring=asset_unlock_tx_duplicate_index.serialize().hex(), maxfeerate=0)
-            raise AssertionError("Transaction should not be mined: double index")
-        except JSONRPCException as e:
-            assert "bad-assetunlock-duplicated-index" in e.error['message']
+        self.send_tx(asset_unlock_tx_duplicate_index,
+            expected_error = "bad-assetunlock-duplicated-index",
+            reason = "double index")
+
+        # Forcibly mine asset_unlock_tx_full and ensure block is invalid
+        self.create_and_check_block(asset_unlock_tx_duplicate_index, expected_error = "bad-assetunlock-duplicated-index")
 
         self.log.info("Fast forward to the next day to reset all current unlock limits...")
         self.slowly_generate_batch(blocks_in_one_day  + 1)
