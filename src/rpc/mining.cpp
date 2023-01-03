@@ -179,6 +179,13 @@ static UniValue generateBlocks(ChainstateManager& chainman, const CTxMemPool& me
     return blockHashes;
 }
 
+static UniValue generateBlocks(ChainstateManager& chainman, const CTxMemPool& mempool, const NodeContext& node_context,
+                         const CScript& coinbase_script, int nGenerate, uint64_t nMaxTries)
+{
+    return generateBlocks(chainman, mempool, *node_context.evodb, *node_context.llmq_ctx->quorum_block_processor, *node_context.llmq_ctx->clhandler,
+            *node_context.llmq_ctx->isman, coinbase_script, nGenerate, nMaxTries);
+}
+
 static bool getScriptFromDescriptor(const std::string& descriptor, CScript& script, std::string& error)
 {
     FlatSigningProvider key_provider;
@@ -244,11 +251,11 @@ static UniValue generatetodescriptor(const JSONRPCRequest& request)
     }
 
     const NodeContext& node_context = EnsureNodeContext(request.context);
-    const CTxMemPool& mempool = EnsureMemPool(request.context);
     ChainstateManager& chainman = EnsureChainman(request.context);
-    LLMQContext& llmq_ctx = EnsureLLMQContext(request.context);
+    const CTxMemPool& mempool = EnsureMemPool(request.context);
+    EnsureLLMQContext(request.context);
 
-    return generateBlocks(chainman, mempool, *node_context.evodb, *llmq_ctx.quorum_block_processor, *llmq_ctx.clhandler, *llmq_ctx.isman, coinbase_script, num_blocks, max_tries);
+    return generateBlocks(chainman, mempool, node_context, coinbase_script, num_blocks, max_tries);
 }
 
 static UniValue generatetoaddress(const JSONRPCRequest& request)
@@ -284,13 +291,13 @@ static UniValue generatetoaddress(const JSONRPCRequest& request)
     }
 
     const NodeContext& node_context = EnsureNodeContext(request.context);
-    const CTxMemPool& mempool = EnsureMemPool(request.context);
     ChainstateManager& chainman = EnsureChainman(request.context);
-    LLMQContext& llmq_ctx = EnsureLLMQContext(request.context);
+    const CTxMemPool& mempool = EnsureMemPool(request.context);
+    EnsureLLMQContext(request.context);
 
     CScript coinbase_script = GetScriptForDestination(destination);
 
-    return generateBlocks(chainman, mempool, *node_context.evodb, *llmq_ctx.quorum_block_processor, *llmq_ctx.clhandler, *llmq_ctx.isman, coinbase_script, nGenerate, nMaxTries);
+    return generateBlocks(chainman, mempool, node_context, coinbase_script, nGenerate, nMaxTries);
 }
 
 static UniValue generateblock(const JSONRPCRequest& request)
@@ -367,7 +374,7 @@ static UniValue generateblock(const JSONRPCRequest& request)
         LOCK(cs_main);
 
         CTxMemPool empty_mempool;
-        std::unique_ptr<CBlockTemplate> blocktemplate(BlockAssembler(*sporkManager, *governance, *llmq_ctx.quorum_block_processor, *llmq_ctx.clhandler, *llmq_ctx.isman, *node_context.evodb, empty_mempool, chainparams).CreateNewBlock(coinbase_script));
+        std::unique_ptr<CBlockTemplate> blocktemplate(BlockAssembler(*sporkManager, *governance, empty_mempool, node_context, chainparams).CreateNewBlock(coinbase_script));
         if (!blocktemplate) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
         }
