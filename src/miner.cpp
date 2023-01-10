@@ -58,17 +58,16 @@ BlockAssembler::Options::Options() {
     nBlockMaxSize = DEFAULT_BLOCK_MAX_SIZE;
 }
 
-BlockAssembler::BlockAssembler(const CSporkManager& sporkManager, CGovernanceManager& governanceManager,
-                               const llmq::CQuorumBlockProcessor& quorumBlockProcessor, llmq::CChainLocksHandler& clhandler,
-                               llmq::CInstantSendManager& isman, CEvoDB& evoDb, const CTxMemPool& mempool, const CChainParams& params, const Options& options) :
+BlockAssembler::BlockAssembler(const CSporkManager& sporkManager, CGovernanceManager& governanceManager, const CTxMemPool& mempool,
+                               const NodeContext& node_context, const CChainParams& params, const Options& options) :
       chainparams(params),
       m_mempool(mempool),
       spork_manager(sporkManager),
       governance_manager(governanceManager),
-      quorum_block_processor(quorumBlockProcessor),
-      m_clhandler(clhandler),
-      m_isman(isman),
-      m_evoDb(evoDb)
+      quorum_block_processor(*node_context.llmq_ctx->quorum_block_processor),
+      m_clhandler(*node_context.llmq_ctx->clhandler),
+      m_isman(*node_context.llmq_ctx->isman),
+      m_evoDb(*node_context.evodb)
 {
     blockMinFeeRate = options.blockMinFeeRate;
     // Limit size to between 1K and MaxBlockSize()-1K for sanity:
@@ -92,18 +91,9 @@ static BlockAssembler::Options DefaultOptions()
     return options;
 }
 
-BlockAssembler::BlockAssembler(const CSporkManager& sporkManager, CGovernanceManager& governanceManager,
-                               const llmq::CQuorumBlockProcessor& quorumBlockProcessor, llmq::CChainLocksHandler& clhandler,
-                               llmq::CInstantSendManager& isman, CEvoDB& evoDb, const CTxMemPool& mempool, const CChainParams& params)
-    : BlockAssembler(sporkManager, governanceManager, quorumBlockProcessor, clhandler, isman, evoDb, mempool, params, DefaultOptions()) {}
-
 BlockAssembler::BlockAssembler(const CSporkManager& sporkManager, CGovernanceManager& governanceManager, const CTxMemPool& mempool,
                                const NodeContext& node_context, const CChainParams& params)
     : BlockAssembler(sporkManager, governanceManager, mempool, node_context, params, DefaultOptions()) {}
-
-BlockAssembler::BlockAssembler(const CSporkManager& sporkManager, CGovernanceManager& governanceManager, const CTxMemPool& mempool,
-                               const NodeContext& node_context, const CChainParams& params, const Options& options)
-    : BlockAssembler(sporkManager, governanceManager, *node_context.llmq_ctx->quorum_block_processor, *node_context.llmq_ctx->clhandler, *node_context.llmq_ctx->isman, *node_context.evodb, mempool, params, options) {}
 
 void BlockAssembler::resetBlock()
 {
