@@ -24,6 +24,7 @@ enum DeploymentPos {
     DEPLOYMENT_DIP0020, // Deployment of DIP0020, DIP0021 and LMQ_100_67 quorums
     DEPLOYMENT_DIP0024, // Deployment of DIP0024 (Quorum Rotation) and decreased governance proposal fee
     DEPLOYMENT_V19,     // Deployment of Basic BLS, AssetLocks, EHF
+    DEPLOYMENT_V20,     // Deployment of Masternode rewards, ...
     // NOTE: Also add new deployments to VersionBitsDeploymentInfo in versionbits.cpp
     MAX_VERSION_BITS_DEPLOYMENTS
 };
