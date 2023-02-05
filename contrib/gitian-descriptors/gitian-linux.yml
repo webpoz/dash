@@ -14,6 +14,7 @@ packages:
 - "bison"
 - "bsdmainutils"
 - "ca-certificates"
+- "cmake"
 - "curl"
 - "faketime"
 - "g++-8"

@@ -17,6 +17,7 @@ packages:
 - "libtiff-tools"
 - "libtool"
 - "automake"
+- "cmake"
 - "faketime"
 - "bsdmainutils"
 - "imagemagick"
