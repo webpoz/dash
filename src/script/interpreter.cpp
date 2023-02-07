@@ -1213,8 +1213,8 @@ bool EvalScript(std::vector<std::vector<unsigned char> >& stack, const CScript& 
                         valtype vchOut1, vchOut2;
                         vchOut1.insert(vchOut1.end(), vch.begin(), vch.begin() + nPosition);
                         vchOut2.insert(vchOut2.end(), vch.begin() + nPosition, vch.end());
-                        stack.emplace_back(move(vchOut1));
-                        stack.emplace_back(move(vchOut2));
+                        stack.emplace_back(std::move(vchOut1));
+                        stack.emplace_back(std::move(vchOut2));
                     }
                 }
                 break;
