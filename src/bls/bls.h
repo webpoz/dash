@@ -307,13 +307,11 @@ public:
 class ConstCBLSPublicKeyVersionWrapper {
 private:
     bool legacy;
-    bool checkMalleable;
     const CBLSPublicKey& obj;
 public:
-    ConstCBLSPublicKeyVersionWrapper(const CBLSPublicKey& obj, bool legacy, bool checkMalleable = true)
+    ConstCBLSPublicKeyVersionWrapper(const CBLSPublicKey& obj, bool legacy)
             : obj(obj)
             , legacy(legacy)
-            , checkMalleable(checkMalleable)
     {}
     template <typename Stream>
     inline void Serialize(Stream& s) const {
