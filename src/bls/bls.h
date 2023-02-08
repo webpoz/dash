@@ -306,8 +306,8 @@ public:
 
 class ConstCBLSPublicKeyVersionWrapper {
 private:
-    bool legacy;
     const CBLSPublicKey& obj;
+    bool legacy;
 public:
     ConstCBLSPublicKeyVersionWrapper(const CBLSPublicKey& obj, bool legacy)
             : obj(obj)
@@ -321,9 +321,9 @@ public:
 
 class CBLSPublicKeyVersionWrapper {
 private:
+    CBLSPublicKey& obj;
     bool legacy;
     bool checkMalleable;
-    CBLSPublicKey& obj;
 public:
     CBLSPublicKeyVersionWrapper(CBLSPublicKey& obj, bool legacy, bool checkMalleable = true)
             : obj(obj)
@@ -369,9 +369,9 @@ public:
 
 class CBLSSignatureVersionWrapper {
 private:
+    CBLSSignature& obj;
     bool legacy;
     bool checkMalleable;
-    CBLSSignature& obj;
 public:
     CBLSSignatureVersionWrapper(CBLSSignature& obj, bool legacy, bool checkMalleable = true)
             : obj(obj)
@@ -561,8 +561,8 @@ using CBLSLazyPublicKey = CBLSLazyWrapper<CBLSPublicKey>;
 
 class CBLSLazyPublicKeyVersionWrapper {
 private:
-    bool legacy;
     CBLSLazyPublicKey& obj;
+    bool legacy;
 public:
     CBLSLazyPublicKeyVersionWrapper(CBLSLazyPublicKey& obj, bool legacy)
             : obj(obj)
