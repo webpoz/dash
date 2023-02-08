@@ -383,7 +383,7 @@ public:
         obj.Serialize(s, legacy);
     }
     template <typename Stream>
-    inline void Unserialize(Stream& s, bool checkMalleable = true) {
+    inline void Unserialize(Stream& s) {
         obj.Unserialize(s, legacy, checkMalleable);
     }
 };
