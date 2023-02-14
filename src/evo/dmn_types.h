@@ -6,39 +6,50 @@
 #define BITCOIN_EVO_DMN_TYPES_H
 
 #include <amount.h>
+#include <serialize.h>
+
 #include <cassert>
 #include <string_view>
 
-class CDeterministicMNType
-{
-public:
-    uint8_t index;
-    int32_t voting_weight;
-    CAmount collat_amount;
-    std::string_view description;
+enum class MnType : uint16_t {
+    Regular = 0,
+    HighPerformance = 1,
 };
 
-namespace MnType {
-constexpr auto Regular = CDeterministicMNType{
-    .index = 0,
-    .voting_weight = 1,
-    .collat_amount = 1000 * COIN,
-    .description = "Regular",
-};
-constexpr auto HighPerformance = CDeterministicMNType{
-    .index = 1,
-    .voting_weight = 4,
-    .collat_amount = 4000 * COIN,
-    .description = "HighPerformance",
-};
-} // namespace MnType
+template<> struct is_serializable_enum<MnType> : std::true_type {};
 
-constexpr const auto& GetMnType(int index)
+struct CMnType
 {
-    switch (index) {
-    case 0: return MnType::Regular;
-    case 1: return MnType::HighPerformance;
-    default: assert(false);
+    const int32_t voting_weight;
+    const CAmount collat_amount;
+    const std::string_view description;
+
+    static constexpr CMnType Regular() {
+        return CMnType{
+            .voting_weight = 1,
+            .collat_amount = 1000 * COIN,
+            .description = "Regular",
+        };
+    }
+    static constexpr CMnType HighPerformance() {
+        return CMnType{
+            .voting_weight = 4,
+            .collat_amount = 4000 * COIN,
+            .description = "HighPerformance",
+        };
+    }
+    static constexpr bool IsCollateralAmount(CAmount amount) {
+        return amount == Regular().collat_amount ||
+            amount == HighPerformance().collat_amount;
+    }
+};
+
+constexpr const CMnType GetMnType(MnType type)
+{
+    switch (type) {
+        case MnType::Regular: return CMnType::Regular();
+        case MnType::HighPerformance: return CMnType::HighPerformance();
+        default: assert(false);
     }
 }
 
