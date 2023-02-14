@@ -24,27 +24,27 @@ struct CMnType
     const CAmount collat_amount;
     const std::string_view description;
 
-    static constexpr CMnType Regular() {
+    [[nodiscard]] static constexpr CMnType Regular() {
         return CMnType{
             .voting_weight = 1,
             .collat_amount = 1000 * COIN,
             .description = "Regular",
         };
     }
-    static constexpr CMnType HighPerformance() {
+    [[nodiscard]] static constexpr CMnType HighPerformance() {
         return CMnType{
             .voting_weight = 4,
             .collat_amount = 4000 * COIN,
             .description = "HighPerformance",
         };
     }
-    static constexpr bool IsCollateralAmount(CAmount amount) {
+    [[nodiscard]] static constexpr bool IsCollateralAmount(CAmount amount) {
         return amount == Regular().collat_amount ||
             amount == HighPerformance().collat_amount;
     }
 };
 
-constexpr const CMnType GetMnType(MnType type)
+[[nodiscard]] constexpr const CMnType GetMnType(MnType type)
 {
     switch (type) {
         case MnType::Regular: return CMnType::Regular();
