@@ -192,7 +192,7 @@ CDeterministicMNCPtr CDeterministicMNList::GetMNPayee(const CBlockIndex* pIndex)
             if (dmn->pdmnState->nLastPaidHeight == nHeight) {
                 // We found the last MN Payee.
                 // If the last payee is a HPMN, we need to check its consecutive payments and pay him again if needed
-                if (dmn->nType == MnType::HighPerformance && dmn->pdmnState->nConsecutivePayments < CMnType::HighPerformance().voting_weight) {
+                if (dmn->nType == MnType::HighPerformance && dmn->pdmnState->nConsecutivePayments < dmn_types::HighPerformance.voting_weight) {
                     best = dmn;
                 }
             }

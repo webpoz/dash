@@ -18,37 +18,39 @@ enum class MnType : uint16_t {
 
 template<> struct is_serializable_enum<MnType> : std::true_type {};
 
-struct CMnType
+namespace dmn_types {
+
+struct mntype_struct
 {
     const int32_t voting_weight;
     const CAmount collat_amount;
     const std::string_view description;
-
-    [[nodiscard]] static constexpr CMnType Regular() {
-        return CMnType{
-            .voting_weight = 1,
-            .collat_amount = 1000 * COIN,
-            .description = "Regular",
-        };
-    }
-    [[nodiscard]] static constexpr CMnType HighPerformance() {
-        return CMnType{
-            .voting_weight = 4,
-            .collat_amount = 4000 * COIN,
-            .description = "HighPerformance",
-        };
-    }
-    [[nodiscard]] static constexpr bool IsCollateralAmount(CAmount amount) {
-        return amount == Regular().collat_amount ||
-            amount == HighPerformance().collat_amount;
-    }
 };
 
-[[nodiscard]] constexpr const CMnType GetMnType(MnType type)
+constexpr auto Regular = mntype_struct{
+    .voting_weight = 1,
+    .collat_amount = 1000 * COIN,
+    .description = "Regular",
+};
+constexpr auto HighPerformance = mntype_struct{
+    .voting_weight = 4,
+    .collat_amount = 4000 * COIN,
+    .description = "HighPerformance",
+};
+
+[[nodiscard]] static constexpr bool IsCollateralAmount(CAmount amount)
+{
+    return amount == Regular.collat_amount ||
+        amount == HighPerformance.collat_amount;
+}
+
+} // namespace dmn_types
+
+[[nodiscard]] constexpr const dmn_types::mntype_struct GetMnType(MnType type)
 {
     switch (type) {
-        case MnType::Regular: return CMnType::Regular();
-        case MnType::HighPerformance: return CMnType::HighPerformance();
+        case MnType::Regular: return dmn_types::Regular;
+        case MnType::HighPerformance: return dmn_types::HighPerformance;
         default: assert(false);
     }
 }
