@@ -11,6 +11,7 @@
 #include <evo/deterministicmns.h>
 #include <llmq/utils.h>
 #include <util/irange.h>
+#include <util/underlying.h>
 
 namespace llmq
 {
@@ -30,7 +31,7 @@ UniValue CDKGDebugSessionStatus::ToJson(int quorumIndex, int detailLevel) const
         }
     }
 
-    ret.pushKV("llmqType", static_cast<uint8_t>(llmqType));
+    ret.pushKV("llmqType", ToUnderlying(llmqType));
     ret.pushKV("quorumHash", quorumHash.ToString());
     ret.pushKV("quorumHeight", (int)quorumHeight);
     ret.pushKV("phase", (int)phase);
