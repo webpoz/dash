@@ -227,7 +227,7 @@ void CQuorumManager::TriggerQuorumDataRecoveryThreads(const CBlockIndex* pIndex)
 
     LogPrint(BCLog::LLMQ, "CQuorumManager::%s -- Process block %s\n", __func__, pIndex->GetBlockHash().ToString());
 
-    for (auto& params : Params().GetConsensus().llmqs) {
+    for (const auto& params : Params().GetConsensus().llmqs) {
         const auto vecQuorums = ScanQuorums(params.type, pIndex, params.keepOldConnections);
 
         // First check if we are member of any quorum of this type
