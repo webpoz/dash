@@ -689,7 +689,7 @@ bool CWallet::EncryptWallet(const SecureString& strWalletPassphrase)
 
         if (auto spk_man = GetLegacyScriptPubKeyMan()) {
             // if we are not using HD, generate new keypool
-            if (spk_man->IsHDEnabled()) {
+            if (IsHDEnabled()) {
                 if (!spk_man->TopUp()) {
                     return false;
                 }
